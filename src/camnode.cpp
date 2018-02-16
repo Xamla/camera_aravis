@@ -42,6 +42,9 @@
 #include <tf/transform_listener.h>
 #include <camera_aravis/CameraAravisConfig.h>
 
+//#include "camera_aravis/SoftwareTrigger.h"
+#include <std_srvs/Empty.h>
+
 #include "XmlRpc.h"
 
 //#define TUNING	// Allows tuning the gains for the timestamp controller.  Publishes output on topic /dt, and receives gains on params /kp, /ki, /kd
@@ -58,7 +61,8 @@
 #define ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(pixel_format) ((((pixel_format) >> 16) & 0xff) >> 3)
 typedef camera_aravis::CameraAravisConfig Config;
 
-static gboolean SoftwareTrigger_callback (void *);
+//static gboolean SoftwareTrigger_callback (void *);
+bool SoftwareTrigger_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
 typedef struct
 {
@@ -388,10 +392,11 @@ void RosReconfigure_callback(Config &config, uint32_t level)
 		}
     	if (!strcmp(config.TriggerSource.c_str(),"Software"))
     	{
-        	ROS_INFO ("Set softwaretriggerrate = %f", 1000.0/ceil(1000.0 / config.softwaretriggerrate));
+            ROS_INFO("Implementation changed, Software Trigger is now a service, changing trigger rate won't do anything");
+			//ROS_INFO ("Set softwaretriggerrate = %f", 1000.0/ceil(1000.0 / config.softwaretriggerrate));
 
     		// Turn on software timer callback.
-    		global.idSoftwareTriggerTimer = g_timeout_add ((guint)ceil(1000.0 / config.softwaretriggerrate), SoftwareTrigger_callback, global.pCamera);
+    		//global.idSoftwareTriggerTimer = g_timeout_add ((guint)ceil(1000.0 / config.softwaretriggerrate), SoftwareTrigger_callback, global.pCamera);
     	}
     }
     if (changedFocusPos)
@@ -598,13 +603,20 @@ static void ControlLost_callback (ArvGvDevice *pGvDevice)
     global.bCancel = TRUE;
 }
 
-static gboolean SoftwareTrigger_callback (void *pCamera)
+// static gboolean SoftwareTrigger_callback (void *pCamera)
+// {
+// 	arv_device_execute_command (global.pDevice, "TriggerSoftware");
+
+//     return TRUE;
+// }
+
+bool SoftwareTrigger_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
 {
-	arv_device_execute_command (global.pDevice, "TriggerSoftware");
-
-    return TRUE;
+	//arv_device_execute_command (global.pDevice, "TriggerSoftware");
+	arv_camera_software_trigger (global.pCamera);
+	ROS_INFO("Execueting Trigger");
+    return true;
 }
-
 
 // PeriodicTask_callback()
 // Check for termination, and spin for ROS.
@@ -842,7 +854,9 @@ int main(int argc, char** argv)
 
     ros::init(argc, argv, "camera");
     global.phNode = new ros::NodeHandle();
-
+	
+	//declaring SW trigger service
+	ros::ServiceServer trigger_service = global.phNode->advertiseService("trigger_acquisition", SoftwareTrigger_callback);
 
 #if !GLIB_CHECK_VERSION(2,35,0)
     g_type_init ();
