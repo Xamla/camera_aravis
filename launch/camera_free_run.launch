@@ -1,0 +1,11 @@
+<launch>
+  <!-- common parameters-->
+  <arg name="TriggerMode_default" value="Off"/>
+  <arg name="AcquisitionMode_default" value="Continuous"/>
+    
+
+  <node name="aravis_camera_node" pkg="camera_aravis" type="camnode">
+    <param name="TriggerMode" value="$(arg TriggerMode_default)"/>
+    <param name="AcquisitionMode" value="$(arg AcquisitionMode_default)"/>
+  </node>
+</launch>
