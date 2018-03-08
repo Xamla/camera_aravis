@@ -42,6 +42,8 @@
 #include <tf/transform_listener.h>
 #include <camera_aravis/CameraAravisConfig.h>
 
+#include <std_srvs/Empty.h>
+
 #include "XmlRpc.h"
 
 //#define TUNING	// Allows tuning the gains for the timestamp controller.  Publishes output on topic /dt, and receives gains on params /kp, /ki, /kd
@@ -58,7 +60,8 @@
 #define ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(pixel_format) ((((pixel_format) >> 16) & 0xff) >> 3)
 typedef camera_aravis::CameraAravisConfig Config;
 
-static gboolean SoftwareTrigger_callback (void *);
+//static gboolean SoftwareTrigger_callback (void *);
+bool SoftwareTrigger_service_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
 typedef struct
 {
@@ -388,10 +391,11 @@ void RosReconfigure_callback(Config &config, uint32_t level)
 		}
     	if (!strcmp(config.TriggerSource.c_str(),"Software"))
     	{
-        	ROS_INFO ("Set softwaretriggerrate = %f", 1000.0/ceil(1000.0 / config.softwaretriggerrate));
+        ROS_INFO("Implementation changed, Software Trigger is now a service, changing trigger rate won't do anything");
+        //ROS_INFO ("Set softwaretriggerrate = %f", 1000.0/ceil(1000.0 / config.softwaretriggerrate));
 
     		// Turn on software timer callback.
-    		global.idSoftwareTriggerTimer = g_timeout_add ((guint)ceil(1000.0 / config.softwaretriggerrate), SoftwareTrigger_callback, global.pCamera);
+        //global.idSoftwareTriggerTimer = g_timeout_add ((guint)ceil(1000.0 / config.softwaretriggerrate), SoftwareTrigger_callback, global.pCamera);
     	}
     }
     if (changedFocusPos)
@@ -458,8 +462,20 @@ void RosReconfigure_callback(Config &config, uint32_t level)
 } // RosReconfigure_callback()
 
 
+int wait_for_init = 0;
+void WriteCameraFeaturesFromRosparam(void);
+
 static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicationdata)
 {
+    if (wait_for_init == 1)
+    {
+        WriteCameraFeaturesFromRosparam ();
+        ROS_INFO("%d frames passed, configure params", wait_for_init);
+    }
+    else if (wait_for_init < 1)
+        ROS_INFO("waiting");
+    wait_for_init++;
+
 	static uint64_t  cm = 0L;	// Camera time prev
 	uint64_t  		 cn = 0L;	// Camera time now
 
@@ -590,7 +606,6 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
     }
 } // NewBuffer_callback()
 
-
 static void ControlLost_callback (ArvGvDevice *pGvDevice)
 {
     ROS_ERROR ("Control lost.");
@@ -598,11 +613,18 @@ static void ControlLost_callback (ArvGvDevice *pGvDevice)
     global.bCancel = TRUE;
 }
 
-static gboolean SoftwareTrigger_callback (void *pCamera)
-{
-	arv_device_execute_command (global.pDevice, "TriggerSoftware");
+//static gboolean SoftwareTrigger_callback (void *pCamera)
+//{
+//	arv_device_execute_command (global.pDevice, "TriggerSoftware");
 
-    return TRUE;
+//    return TRUE;
+//}
+
+bool SoftwareTrigger_service_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
+{
+  arv_device_execute_command (global.pDevice, "TriggerSoftware");
+  ROS_INFO("Trigger Execueted");
+  return true;
 }
 
 
@@ -999,7 +1021,7 @@ int main(int argc, char** argv)
 		}
 
 
-		WriteCameraFeaturesFromRosparam ();
+//		WriteCameraFeaturesFromRosparam ();
 
 
 #ifdef TUNING			
@@ -1016,12 +1038,12 @@ int main(int argc, char** argv)
 		global.pCameraInfoManager = new camera_info_manager::CameraInfoManager(ros::NodeHandle(ros::this_node::getName()), arv_device_get_string_feature_value (global.pDevice, "DeviceID"), camera_info_url);
 
 		// Start the dynamic_reconfigure server.
-		dynamic_reconfigure::Server<Config> 				reconfigureServer;
-		dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
+//		dynamic_reconfigure::Server<Config> 				reconfigureServer;
+//		dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
 
-		reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
-		reconfigureServer.setCallback(reconfigureCallback);
-		ros::Duration(2.0).sleep();
+//		reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
+//		reconfigureServer.setCallback(reconfigureCallback);
+//		ros::Duration(2.0).sleep();
 
 
 		// Get parameter current values.
@@ -1112,6 +1134,9 @@ int main(int argc, char** argv)
 		// Set up image_raw.
 		image_transport::ImageTransport		*pTransport = new image_transport::ImageTransport(*global.phNode);
 		global.publisher = pTransport->advertiseCamera(ros::this_node::getName()+"/image_raw", 1);
+
+    //declaring SW trigger service
+    ros::ServiceServer trigger_service = global.phNode->advertiseService(ros::this_node::getName()+"/trigger_acquisition", SoftwareTrigger_service_callback);
 
 		// Connect signals with callbacks.
 		g_signal_connect (pStream,        "new-buffer",   G_CALLBACK (NewBuffer_callback),   &applicationdata);
