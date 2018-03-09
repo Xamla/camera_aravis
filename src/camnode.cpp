@@ -471,134 +471,134 @@ void RosReconfigure_callback(Config &config, uint32_t level)
 
 static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicationdata)
 {
-    //call parameter setting in the first stream callback
-    if (did_glib_init == false)
+  //call parameter setting in the first stream callback
+  if (did_glib_init == false)
+  {
+    ROS_INFO("flushed 1 frame, configuring params");
+    WriteCameraFeaturesFromRosparam ();
+    print_info();
+    //set did_glib_init true at the end of the function
+    //did_glib_init = true;
+  }
+
+  static uint64_t  cm = 0L;	// Camera time prev
+  uint64_t  		 cn = 0L;	// Camera time now
+
+#ifdef TUNING			
+  static uint64_t  rm = 0L;	// ROS time prev
+#endif
+  uint64_t  		 rn = 0L;	// ROS time now
+
+  static uint64_t	 tm = 0L;	// Calculated image time prev
+  uint64_t		 tn = 0L;	// Calculated image time now
+
+  static int64_t   em = 0L;	// Error prev.
+  int64_t  		 en = 0L;	// Error now between calculated image time and ROS time.
+  int64_t  		 de = 0L;	// derivative.
+  int64_t  		 ie = 0L;	// integral.
+  int64_t			 u = 0L;	// Output of controller.
+
+  int64_t			 kp1 = 0L;		// Fractional gains in integer form.
+  int64_t			 kp2 = 1024L;
+  int64_t			 kd1 = 0L;
+  int64_t			 kd2 = 1024L;
+  int64_t			 ki1 = -1L;		// A gentle pull toward zero.
+  int64_t			 ki2 = 1024L;
+
+  static uint32_t	 iFrame = 0;	// Frame counter.
+
+  ArvBuffer		*pBuffer;
+
+
+#ifdef TUNING			
+  std_msgs::Int64  msgInt64;
+  int 			 kp = 0;
+  int 			 kd = 0;
+  int 			 ki = 0;
+
+  if (global.phNode->hasParam(ros::this_node::getName()+"/kp"))
+  {
+    global.phNode->getParam(ros::this_node::getName()+"/kp", kp);
+    kp1 = kp;
+  }
+
+  if (global.phNode->hasParam(ros::this_node::getName()+"/kd"))
+  {
+    global.phNode->getParam(ros::this_node::getName()+"/kd", kd);
+    kd1 = kd;
+  }
+
+  if (global.phNode->hasParam(ros::this_node::getName()+"/ki"))
+  {
+    global.phNode->getParam(ros::this_node::getName()+"/ki", ki);
+    ki1 = ki;
+  }
+#endif
+
+  pBuffer = arv_stream_try_pop_buffer (pStream);
+  if (pBuffer != NULL)
+  {
+    if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS)
     {
-        ROS_INFO("flushed 1 frame, configuring params");
-        WriteCameraFeaturesFromRosparam ();
-        print_info();
-        //set did_glib_init true at the end of the function
-        //did_glib_init = true;
-    }
+      sensor_msgs::Image msg;
 
-	static uint64_t  cm = 0L;	// Camera time prev
-	uint64_t  		 cn = 0L;	// Camera time now
-
-#ifdef TUNING			
-	static uint64_t  rm = 0L;	// ROS time prev
-#endif
-	uint64_t  		 rn = 0L;	// ROS time now
-
-	static uint64_t	 tm = 0L;	// Calculated image time prev
-	uint64_t		 tn = 0L;	// Calculated image time now
-		
-	static int64_t   em = 0L;	// Error prev.
-	int64_t  		 en = 0L;	// Error now between calculated image time and ROS time.
-	int64_t  		 de = 0L;	// derivative.
-	int64_t  		 ie = 0L;	// integral.
-	int64_t			 u = 0L;	// Output of controller.
-	
-	int64_t			 kp1 = 0L;		// Fractional gains in integer form.
-	int64_t			 kp2 = 1024L;
-	int64_t			 kd1 = 0L;
-	int64_t			 kd2 = 1024L;
-	int64_t			 ki1 = -1L;		// A gentle pull toward zero.
-	int64_t			 ki2 = 1024L;
-
-	static uint32_t	 iFrame = 0;	// Frame counter.
-    
-	ArvBuffer		*pBuffer;
-
-	
-#ifdef TUNING			
-	std_msgs::Int64  msgInt64;
-	int 			 kp = 0;
-	int 			 kd = 0;
-	int 			 ki = 0;
-    
-	if (global.phNode->hasParam(ros::this_node::getName()+"/kp"))
-	{
-		global.phNode->getParam(ros::this_node::getName()+"/kp", kp);
-		kp1 = kp;
-	}
-	
-	if (global.phNode->hasParam(ros::this_node::getName()+"/kd"))
-	{
-		global.phNode->getParam(ros::this_node::getName()+"/kd", kd);
-		kd1 = kd;
-	}
-	
-	if (global.phNode->hasParam(ros::this_node::getName()+"/ki"))
-	{
-		global.phNode->getParam(ros::this_node::getName()+"/ki", ki);
-		ki1 = ki;
-	}
-#endif
-	
-    pBuffer = arv_stream_try_pop_buffer (pStream);
-    if (pBuffer != NULL) 
-    {
-        if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS) 
-        {
-			sensor_msgs::Image msg;
-			
-			pApplicationdata->nBuffers++;
-			size_t pSize = 0;
-			const void *pData = arv_buffer_get_data(pBuffer, &pSize);
-			std::vector<uint8_t> this_data(pSize);
-			memcpy(&this_data[0], pData, pSize);
+      pApplicationdata->nBuffers++;
+      size_t pSize = 0;
+      const void *pData = arv_buffer_get_data(pBuffer, &pSize);
+      std::vector<uint8_t> this_data(pSize);
+      memcpy(&this_data[0], pData, pSize);
 
 
-			// Camera/ROS Timestamp coordination.
-			cn				= (uint64_t)arv_buffer_get_timestamp(pBuffer);				// Camera now
-			rn	 			= ros::Time::now().toNSec();					// ROS now
-			global.frame_id++;
-			
-			if (iFrame < 10)
-			{
-				cm = cn;
-				tm  = rn;
-			}
-			
-			// Control the error between the computed image timestamp and the ROS timestamp.
-			en = (int64_t)tm + (int64_t)cn - (int64_t)cm - (int64_t)rn; // i.e. tn-rn, but calced from prior values.
-			de = en-em;
-			ie += en;
-			u = kp1*(en/kp2) + ki1*(ie/ki2) + kd1*(de/kd2);  // kp<0, ki<0, kd>0
-			
-			// Compute the new timestamp.
-			tn = (uint64_t)((int64_t)tm + (int64_t)cn-(int64_t)cm + u);
+      // Camera/ROS Timestamp coordination.
+      cn				= (uint64_t)arv_buffer_get_timestamp(pBuffer);				// Camera now
+      rn	 			= ros::Time::now().toNSec();					// ROS now
+      global.frame_id++;
+
+      if (iFrame < 10)
+      {
+        cm = cn;
+        tm  = rn;
+      }
+
+      // Control the error between the computed image timestamp and the ROS timestamp.
+      en = (int64_t)tm + (int64_t)cn - (int64_t)cm - (int64_t)rn; // i.e. tn-rn, but calced from prior values.
+      de = en-em;
+      ie += en;
+      u = kp1*(en/kp2) + ki1*(ie/ki2) + kd1*(de/kd2);  // kp<0, ki<0, kd>0
+
+      // Compute the new timestamp.
+      tn = (uint64_t)((int64_t)tm + (int64_t)cn-(int64_t)cm + u);
 
 #ifdef TUNING			
-			ROS_WARN("en=%16ld, ie=%16ld, de=%16ld, u=%16ld + %16ld + %16ld = %16ld", en, ie, de, kp1*(en/kp2), ki1*(ie/ki2), kd1*(de/kd2), u);
-			ROS_WARN("cn=%16lu, rn=%16lu, cn-cm=%8ld, rn-rm=%8ld, tn-tm=%8ld, tn-rn=%ld", cn, rn, cn-cm, rn-rm, (int64_t)tn-(int64_t)tm, tn-rn);
-			msgInt64.data = tn-rn; //cn-cm+tn-tm; //
-			global.ppubInt64->publish(msgInt64);
-			rm = rn;
+      ROS_WARN("en=%16ld, ie=%16ld, de=%16ld, u=%16ld + %16ld + %16ld = %16ld", en, ie, de, kp1*(en/kp2), ki1*(ie/ki2), kd1*(de/kd2), u);
+      ROS_WARN("cn=%16lu, rn=%16lu, cn-cm=%8ld, rn-rm=%8ld, tn-tm=%8ld, tn-rn=%ld", cn, rn, cn-cm, rn-rm, (int64_t)tn-(int64_t)tm, tn-rn);
+      msgInt64.data = tn-rn; //cn-cm+tn-tm; //
+      global.ppubInt64->publish(msgInt64);
+      rm = rn;
 #endif
-			
-			// Save prior values.
-			cm = cn;
-			tm = tn;
-			em = en;
-			
-			// Construct the image message.
-			msg.header.stamp.fromNSec(tn);
-			msg.header.seq = global.frame_id;
-			msg.header.frame_id = global.config.frame_id;
-			msg.width = global.widthRoi;
-			msg.height = global.heightRoi;
-			msg.encoding = global.pszPixelformat;
-			msg.step = msg.width * global.nBytesPixel;
-			msg.data = this_data;
 
-			// get current CameraInfo data
-			global.camerainfo = global.pCameraInfoManager->getCameraInfo();
-			global.camerainfo.header.stamp = msg.header.stamp;
-			global.camerainfo.header.seq = msg.header.seq;
-			global.camerainfo.header.frame_id = msg.header.frame_id;
-			global.camerainfo.width = global.widthRoi;
-			global.camerainfo.height = global.heightRoi;
+      // Save prior values.
+      cm = cn;
+      tm = tn;
+      em = en;
+
+      // Construct the image message.
+      msg.header.stamp.fromNSec(tn);
+      msg.header.seq = global.frame_id;
+      msg.header.frame_id = global.config.frame_id;
+      msg.width = global.widthRoi;
+      msg.height = global.heightRoi;
+      msg.encoding = global.pszPixelformat;
+      msg.step = msg.width * global.nBytesPixel;
+      msg.data = this_data;
+
+      // get current CameraInfo data
+      global.camerainfo = global.pCameraInfoManager->getCameraInfo();
+      global.camerainfo.header.stamp = msg.header.stamp;
+      global.camerainfo.header.seq = msg.header.seq;
+      global.camerainfo.header.frame_id = msg.header.frame_id;
+      global.camerainfo.width = global.widthRoi;
+      global.camerainfo.height = global.heightRoi;
 
       if (did_glib_init == true)
       {
@@ -612,7 +612,9 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
         }
       }
       else
+      {
         ROS_WARN ("Frame error: %s", szBufferStatusFromInt[arv_buffer_get_status(pBuffer)]);
+      }
 
       arv_stream_push_buffer (pStream, pBuffer);
       iFrame++;
@@ -620,7 +622,7 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
 
     //to avoid calling parameters initilization again
     did_glib_init = true;
-
+  }
 } // NewBuffer_callback()
 
 static void ControlLost_callback (ArvGvDevice *pGvDevice)
