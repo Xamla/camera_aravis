@@ -43,6 +43,8 @@
 #include <camera_aravis/CameraAravisConfig.h>
 
 #include <std_srvs/Empty.h>
+#include <camera_aravis/CaptureImage.h>
+#include <sensor_msgs/Image.h>
 
 #include "XmlRpc.h"
 
@@ -65,6 +67,8 @@ void WriteCameraFeaturesFromRosparam(void);
 void print_info();
 
 bool did_glib_init;
+sensor_msgs::Image service_image;
+bool new_service_image_available;
 
 typedef struct
 {
@@ -597,14 +601,21 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
 			global.camerainfo.height = global.heightRoi;
 
       if (did_glib_init == true)
+      {
         global.publisher.publish(msg, global.camerainfo); //skip first publish
-				
+
+        //TODO probably when adding triggering while stream is available i have to add some checkings
+        if (global.config.TriggerMode.compare("On"))
+        {
+          service_image = msg;
+          new_service_image_available = true;
         }
-        else
-        	ROS_WARN ("Frame error: %s", szBufferStatusFromInt[arv_buffer_get_status(pBuffer)]);
-        	
-        arv_stream_push_buffer (pStream, pBuffer);
-        iFrame++;
+      }
+      else
+        ROS_WARN ("Frame error: %s", szBufferStatusFromInt[arv_buffer_get_status(pBuffer)]);
+
+      arv_stream_push_buffer (pStream, pBuffer);
+      iFrame++;
     }
 
     //to avoid calling parameters initilization again
@@ -626,17 +637,23 @@ static void ControlLost_callback (ArvGvDevice *pGvDevice)
 //    return TRUE;
 //}
 
-bool SoftwareTrigger_service_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
+bool SoftwareTrigger_service_callback(camera_aravis::CaptureImage::Request& request, camera_aravis::CaptureImage::Response& response)
 {
+  //TODO when continuous stream trigger mode is added - add messages for which mode the service is on now
   if(!global.isImplementedTriggerMode)
     ROS_WARN("Trigger Mode not implemented by camera");
   else
   {
-    //if() add messages for which mode the service is on now
     arv_device_execute_command (global.pDevice, "TriggerSoftware");
     ROS_INFO("Trigger Execueted");
+
+    while (ros::ok()) //waiting for the image to be available
+      if(new_service_image_available) break;
+
+    response.image = service_image;
   }
-    return true;
+  new_service_image_available = false;
+  return true;
 }
 
 
@@ -924,6 +941,7 @@ int main(int argc, char** argv)
     ArvGcNode	*pGcNode;
 	GError		*error=NULL;
   did_glib_init = false;
+  new_service_image_available = false;
 
 
     
