@@ -9,6 +9,8 @@ find_package(GLIB2 REQUIRED)
 add_service_files(
   FILES
   CaptureImage.srv
+  AravisSetExposure.srv
+  TriggerFlash.srv
 )
 
 generate_messages(

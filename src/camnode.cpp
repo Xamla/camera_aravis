@@ -42,8 +42,9 @@
 #include <tf/transform_listener.h>
 #include <camera_aravis/CameraAravisConfig.h>
 
-#include <std_srvs/Empty.h>
 #include <camera_aravis/CaptureImage.h>
+#include <camera_aravis/AravisSetExposure.h>
+#include <camera_aravis/TriggerFlash.h>
 #include <sensor_msgs/Image.h>
 
 #include "XmlRpc.h"
@@ -69,7 +70,6 @@ void print_info();
 bool did_glib_init;
 sensor_msgs::Image service_image;
 bool new_service_image_available;
-bool did_dynamic_reconf_init;  //TODO just a trial - delete this
 
 typedef struct
 {
@@ -478,13 +478,6 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
     ROS_INFO("flushed 1 frame, configuring params");
     WriteCameraFeaturesFromRosparam ();
     print_info();
-    //init dynamice reconfigure
-//    dynamic_reconfigure::Server<Config> 				reconfigureServer;
-//    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
-
-//    reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
-//    reconfigureServer.setCallback(reconfigureCallback);
-//    ros::Duration(2.0).sleep();
     //set did_glib_init true at the end of the function
     //did_glib_init = true;
   }
@@ -612,7 +605,6 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
       {
         global.publisher.publish(msg, global.camerainfo); //skip first publish
 
-        //TODO probably when adding triggering while stream is available i have to add some checkings
         if (global.config.TriggerMode.compare("On"))
         {
           service_image = msg;
@@ -648,12 +640,15 @@ static void ControlLost_callback (ArvGvDevice *pGvDevice)
 //}
 
 bool SoftwareTrigger_service_callback(camera_aravis::CaptureImage::Request& request, camera_aravis::CaptureImage::Response& response)
+//TODO probably this should wait for did_glib_init
 {
-  //TODO when continuous stream trigger mode is added - add messages for which mode the service is on now
-  if(!global.isImplementedTriggerMode)
-    ROS_WARN("Trigger Mode not implemented by camera");
-  else
-  {
+  //checking Triggermode Skipped - if the camera doesn't support triggering - the service returns the next frame in buffer
+  //this is Skipped as the camera will switch to Mode2, if trigger is not supported
+  //check PeriodicTask_callback() for more details about modes
+//  if(!global.isImplementedTriggerMode)
+//    ROS_WARN("Trigger Mode not implemented by camera");
+//  else
+//  {
     arv_device_execute_command (global.pDevice, "TriggerSoftware");
     ROS_INFO("Trigger Execueted");
 
@@ -661,8 +656,42 @@ bool SoftwareTrigger_service_callback(camera_aravis::CaptureImage::Request& requ
       if(new_service_image_available) break;
 
     response.image = service_image;
-  }
+//  }
   new_service_image_available = false;
+  return true;
+}
+
+bool exposure_time_service_callback(camera_aravis::AravisSetExposure::Request& req, camera_aravis::AravisSetExposure::Response& res)
+{
+  //TODO add mutex
+  //TODO set ExposureAuto=Off (default) & ExposureMode=Timed (for ids camera ExposureMode has only one option no need to set it)
+  //TODO add warnings to bounds
+  float time = req.time;
+  arv_device_set_float_feature_value (global.pDevice, "ExposureTime", req.time);
+  ROS_INFO("ExposureTime = %f", arv_device_get_float_feature_value (global.pDevice, "ExposureTime"));
+  return true;
+}
+
+bool trigger_flash_callback(camera_aravis::TriggerFlash::Request& req, camera_aravis::TriggerFlash::Response& res)
+{
+  //TODO setting is specific to current connected Flash light - maybe add some params or option to the service
+  //flash is connected to Line3 which is connected to userOutput3
+
+  double time = 0;
+  if(req.time <= 0.0) time = 1;
+  else time = req.time;
+
+  //trigger flash
+  arv_device_set_string_feature_value(global.pDevice, "LineSelector", "Line3");
+  arv_device_set_string_feature_value(global.pDevice, "LineMode", "Output");
+  arv_device_set_string_feature_value(global.pDevice, "LineSource", "UserOutput3");
+  arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 1);
+  //arv_device_set_string_feature_value(global.pDevice, "UserOutputValue", "true");
+  arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 1);
+  ros::Duration(time).sleep();
+  //arv_device_set_string_feature_value(global.pDevice, "UserOutputValue", "false");
+  arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 0);
+  ROS_INFO("Flash triggered for %f", time);
   return true;
 }
 
@@ -671,47 +700,30 @@ bool SoftwareTrigger_service_callback(camera_aravis::CaptureImage::Request& requ
 // Check for termination, and spin for ROS.
 static gboolean PeriodicTask_callback (void *applicationdata)
 {
-  //TODO should this be skipped for first time - maybe wait for did_glib_init
-
+  //Checking if a node subscribed to the /image_raw topic   ------------------------------------------------------------------
+  //if so,  make the camera output a continuous stream - calling the service will return the next image in the stream buffer - Mode2
+  //if not, the camera automatically switch to TriggerMode=on and wait for a trigger signal - using camera built-in trigger feature - Mode1
+  //TODO probably this should wait for did_glib_init
   int number_of_subscribers = global.publisher.getNumSubscribers();
-  ROS_INFO("number_of_subscribers: %d", number_of_subscribers); //TODO delete - debug
-  //ROS_INFO("TriggerMode %s", global.config.TriggerMode.c_str()); //TODO delete - debug
-  ROS_INFO("TriggerMode %s", arv_device_get_string_feature_value (global.pDevice, "TriggerMode")); //TODO delete - debug
+  //ROS_INFO("number_of_subscribers: %d", number_of_subscribers); //TODO delete - debug
+  //ROS_INFO("TriggerMode %s", arv_device_get_string_feature_value (global.pDevice, "TriggerMode")); //TODO delete - debug
 
-  //if ( number_of_subscribers == 0 && global.config.TriggerMode == "Off")
   if ( number_of_subscribers == 0 && strcmp(arv_device_get_string_feature_value(global.pDevice, "TriggerMode"), "Off") == 0)
   {
-    //TODO update the ros parameter itslf - don't set it directly to the camera - after setting how to update the parameters
     arv_device_set_string_feature_value(global.pDevice, "TriggerMode", "On");
-    //global.config.TriggerMode = "On";
-    //WriteCameraFeaturesFromRosparam();
     ROS_INFO("No subscribers to /image_raw topic, switching to TriggerMode=On");
     ROS_INFO("Using Camera built-in SW trigger");
   }
-  //else if( number_of_subscribers > 0 && global.config.TriggerMode == "On")
   else if( number_of_subscribers > 0 && strcmp(arv_device_get_string_feature_value(global.pDevice, "TriggerMode"), "On") == 0)
   {
-    //TODO update the ros parameter itself - don't set it directly to the camera - after setting how to update the parameters
     arv_device_set_string_feature_value(global.pDevice, "TriggerMode", "Off");
-    //global.config.TriggerMode = "Off";
-    //WriteCameraFeaturesFromRosparam();
-    //TODO set the AcqusitionMode to continuous - the if condition also has to be changed
-    ROS_INFO("a Node subscribed to /image_raw topic, switching TriggerMode=Off, a continuous stream is running");
+    arv_device_set_string_feature_value (global.pDevice, "AcquisitionMode", "Continuous");
+    ROS_INFO("a Node subscribed to /image_raw topic, switching TriggerMode=Off, AcquisitionMode=Continuous stream is running");
     ROS_WARN("if SW triggering Function is called it return the next frame from the contiunous stream,");
     ROS_WARN("  this mode is not using the camera built-in trigger method,");
     ROS_WARN("  unsubscribe from /image_raw topic to return to using camera built-in trigger method");
   }
-
-//  //TODO just a trial to understand something - delete this
-//  if(!did_dynamic_reconf_init)
-//  {
-//    dynamic_reconfigure::Server<Config> 				reconfigureServer;
-//    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
-
-//    reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
-//    reconfigureServer.setCallback(reconfigureCallback);
-//    ros::Duration(2.0).sleep();
-//  }
+  //-------------------------------------------------------------------------------------------------------------------------
 
   ApplicationData *pData = (ApplicationData*)applicationdata;
 
@@ -994,11 +1006,8 @@ int main(int argc, char** argv)
 	GError		*error=NULL;
   did_glib_init = false;
   new_service_image_available = false;
-  did_glib_init = false;
-
-
     
-    
+
     global.bCancel = FALSE;
     global.config = global.config.__getDefault__();
     global.idSoftwareTriggerTimer = 0;
@@ -1179,7 +1188,7 @@ int main(int argc, char** argv)
 		global.pCameraInfoManager = new camera_info_manager::CameraInfoManager(ros::NodeHandle(ros::this_node::getName()), arv_device_get_string_feature_value (global.pDevice, "DeviceID"), camera_info_url);
 
 		// Start the dynamic_reconfigure server.
-//    ROS_WARN("dynamic reconfigure is disabled in this fork"); //TODO delete after making it work again
+    ROS_WARN("dynamic reconfigure is disabled in this fork");
 //    dynamic_reconfigure::Server<Config> 				reconfigureServer;
 //    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
 
@@ -1221,8 +1230,15 @@ int main(int argc, char** argv)
 		image_transport::ImageTransport		*pTransport = new image_transport::ImageTransport(*global.phNode);
 		global.publisher = pTransport->advertiseCamera(ros::this_node::getName()+"/image_raw", 1);
 
-    //declaring SW trigger servic
+    //declaring SW trigger service
     ros::ServiceServer trigger_service = global.phNode->advertiseService(ros::this_node::getName()+"/trigger_acquisition", SoftwareTrigger_service_callback);
+
+    //declaring changing exposure service
+    ros::ServiceServer exposure_time_service = global.phNode->advertiseService(ros::this_node::getName()+"/set_ExposureTime", exposure_time_service_callback);
+
+
+    //declaring IO service
+    ros::ServiceServer trigger_flash = global.phNode->advertiseService(ros::this_node::getName()+"/trigger_flash", trigger_flash_callback);
 
     // Connect signals with callbacks.
 		g_signal_connect (pStream,        "new-buffer",   G_CALLBACK (NewBuffer_callback),   &applicationdata);
