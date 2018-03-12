@@ -685,11 +685,9 @@ bool trigger_flash_callback(camera_aravis::TriggerFlash::Request& req, camera_ar
   arv_device_set_string_feature_value(global.pDevice, "LineSelector", "Line3");
   arv_device_set_string_feature_value(global.pDevice, "LineMode", "Output");
   arv_device_set_string_feature_value(global.pDevice, "LineSource", "UserOutput3");
-  arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 1);
-  //arv_device_set_string_feature_value(global.pDevice, "UserOutputValue", "true");
+  arv_device_set_string_feature_value(global.pDevice, "UserOutputSelector", "UserOutput3");
   arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 1);
   ros::Duration(time).sleep();
-  //arv_device_set_string_feature_value(global.pDevice, "UserOutputValue", "false");
   arv_device_set_integer_feature_value(global.pDevice, "UserOutputValue", 0);
   ROS_INFO("Flash triggered for %f", time);
   return true;
