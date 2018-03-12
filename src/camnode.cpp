@@ -69,6 +69,7 @@ void print_info();
 bool did_glib_init;
 sensor_msgs::Image service_image;
 bool new_service_image_available;
+bool did_dynamic_reconf_init;  //TODO just a trial - delete this
 
 typedef struct
 {
@@ -477,6 +478,13 @@ static void NewBuffer_callback (ArvStream *pStream, ApplicationData *pApplicatio
     ROS_INFO("flushed 1 frame, configuring params");
     WriteCameraFeaturesFromRosparam ();
     print_info();
+    //init dynamice reconfigure
+//    dynamic_reconfigure::Server<Config> 				reconfigureServer;
+//    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
+
+//    reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
+//    reconfigureServer.setCallback(reconfigureCallback);
+//    ros::Duration(2.0).sleep();
     //set did_glib_init true at the end of the function
     //did_glib_init = true;
   }
@@ -663,20 +671,62 @@ bool SoftwareTrigger_service_callback(camera_aravis::CaptureImage::Request& requ
 // Check for termination, and spin for ROS.
 static gboolean PeriodicTask_callback (void *applicationdata)
 {
-    ApplicationData *pData = (ApplicationData*)applicationdata;
+  //TODO should this be skipped for first time - maybe wait for did_glib_init
 
-    //  ROS_INFO ("Frame rate = %d Hz", pData->nBuffers);
-    pData->nBuffers = 0;
+  int number_of_subscribers = global.publisher.getNumSubscribers();
+  ROS_INFO("number_of_subscribers: %d", number_of_subscribers); //TODO delete - debug
+  //ROS_INFO("TriggerMode %s", global.config.TriggerMode.c_str()); //TODO delete - debug
+  ROS_INFO("TriggerMode %s", arv_device_get_string_feature_value (global.pDevice, "TriggerMode")); //TODO delete - debug
 
-    if (global.bCancel)
-    {
-        g_main_loop_quit (pData->main_loop);
-        return FALSE;
-    }
+  //if ( number_of_subscribers == 0 && global.config.TriggerMode == "Off")
+  if ( number_of_subscribers == 0 && strcmp(arv_device_get_string_feature_value(global.pDevice, "TriggerMode"), "Off") == 0)
+  {
+    //TODO update the ros parameter itslf - don't set it directly to the camera - after setting how to update the parameters
+    arv_device_set_string_feature_value(global.pDevice, "TriggerMode", "On");
+    //global.config.TriggerMode = "On";
+    //WriteCameraFeaturesFromRosparam();
+    ROS_INFO("No subscribers to /image_raw topic, switching to TriggerMode=On");
+    ROS_INFO("Using Camera built-in SW trigger");
+  }
+  //else if( number_of_subscribers > 0 && global.config.TriggerMode == "On")
+  else if( number_of_subscribers > 0 && strcmp(arv_device_get_string_feature_value(global.pDevice, "TriggerMode"), "On") == 0)
+  {
+    //TODO update the ros parameter itself - don't set it directly to the camera - after setting how to update the parameters
+    arv_device_set_string_feature_value(global.pDevice, "TriggerMode", "Off");
+    //global.config.TriggerMode = "Off";
+    //WriteCameraFeaturesFromRosparam();
+    //TODO set the AcqusitionMode to continuous - the if condition also has to be changed
+    ROS_INFO("a Node subscribed to /image_raw topic, switching TriggerMode=Off, a continuous stream is running");
+    ROS_WARN("if SW triggering Function is called it return the next frame from the contiunous stream,");
+    ROS_WARN("  this mode is not using the camera built-in trigger method,");
+    ROS_WARN("  unsubscribe from /image_raw topic to return to using camera built-in trigger method");
+  }
 
-    ros::spinOnce();
+//  //TODO just a trial to understand something - delete this
+//  if(!did_dynamic_reconf_init)
+//  {
+//    dynamic_reconfigure::Server<Config> 				reconfigureServer;
+//    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
 
-    return TRUE;
+//    reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
+//    reconfigureServer.setCallback(reconfigureCallback);
+//    ros::Duration(2.0).sleep();
+//  }
+
+  ApplicationData *pData = (ApplicationData*)applicationdata;
+
+  //  ROS_INFO ("Frame rate = %d Hz", pData->nBuffers);
+  pData->nBuffers = 0;
+
+  if (global.bCancel)
+  {
+      g_main_loop_quit (pData->main_loop);
+      return FALSE;
+  }
+
+  ros::spinOnce();
+
+  return TRUE;
 } // PeriodicTask_callback()
 
 
@@ -944,6 +994,7 @@ int main(int argc, char** argv)
 	GError		*error=NULL;
   did_glib_init = false;
   new_service_image_available = false;
+  did_glib_init = false;
 
 
     
@@ -1128,7 +1179,7 @@ int main(int argc, char** argv)
 		global.pCameraInfoManager = new camera_info_manager::CameraInfoManager(ros::NodeHandle(ros::this_node::getName()), arv_device_get_string_feature_value (global.pDevice, "DeviceID"), camera_info_url);
 
 		// Start the dynamic_reconfigure server.
-    ROS_WARN("dynamic reconfigure is disabled in this fork");
+//    ROS_WARN("dynamic reconfigure is disabled in this fork"); //TODO delete after making it work again
 //    dynamic_reconfigure::Server<Config> 				reconfigureServer;
 //    dynamic_reconfigure::Server<Config>::CallbackType 	reconfigureCallback;
 
