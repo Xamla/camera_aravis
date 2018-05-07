@@ -15,11 +15,11 @@ generate_dynamic_reconfigure_options(cfg/CameraAravisConfig.cfg)
 catkin_package(
     DEPENDS Aravis GLIB2
     CATKIN_DEPENDS roscpp sensor_msgs image_transport camera_info_manager dynamic_reconfigure tf
-    INCLUDE_DIRS
+    INCLUDE_DIRS include
     LIBRARIES
 )
 
-include_directories(cfg/cpp ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB2_INCLUDE_DIRS})
+include_directories(include cfg/cpp ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB2_INCLUDE_DIRS})
 
 message(${ARAVIS_LIBRARY})
 
