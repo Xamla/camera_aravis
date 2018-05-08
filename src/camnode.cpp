@@ -32,7 +32,8 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
-#include <mutex>
+#include <functional>
+#include <utility>
 #include <stdlib.h>
 #include <math.h>
 
@@ -46,9 +47,9 @@
 #include <image_transport/image_transport.h>
 #include <camera_info_manager/camera_info_manager.h>
 
-//#include <dynamic_reconfigure/server.h>
-//#include <tf/transform_listener.h>
-//#include <camera_aravis/CameraAravisConfig.h>
+#include <camera_aravis/Capture.h>
+#include <camera_aravis/GetConnectedDevice.h>
+#include <camera_aravis/SendCommand.h>
 
 //#include "camera_aravis/SoftwareTrigger.h"
 #include <std_srvs/Empty.h>
@@ -111,12 +112,15 @@ struct Config
 
 struct GeniCam
 {
-  bool isRunning;
+  bool isReady;
+  bool isStreaming;
+  bool isNewImage;
 
   std::shared_ptr<image_transport::ImageTransport> pTransport;
   image_transport::CameraPublisher publisher;
   std::unique_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
   sensor_msgs::CameraInfo camerainfo;
+  sensor_msgs::Image imageMsg;
 
   // aravis g_objects
   ArvCamera* pCamera;
@@ -188,7 +192,6 @@ typedef struct
   GMainLoop* main_loop;
 } ApplicationData;
 
-std::mutex NewBufferMutex;
 // ------------------------------------
 
 // Conversions from integers to Arv types.
@@ -309,8 +312,6 @@ static void NewBuffer_callback(ArvStream* pStream,
   {
     if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS)
     {
-      sensor_msgs::Image msg;
-
       pCameradata->nBuffers++;
       size_t pSize = 0;
       const void* pData = arv_buffer_get_data(pBuffer, &pSize);
@@ -358,24 +359,25 @@ static void NewBuffer_callback(ArvStream* pStream,
       pCameradata->em = en;
 
       // Construct the image message.
-      msg.header.stamp.fromNSec(tn);
-      msg.header.seq = pCameradata->frame_id;
-      msg.header.frame_id = pCameradata->config.frame_id;
-      msg.width = pCameradata->widthRoi;
-      msg.height = pCameradata->heightRoi;
-      msg.encoding = pCameradata->pszPixelformat;
-      msg.step = msg.width * pCameradata->nBytesPixel;
-      msg.data = this_data;
+      pCameradata->imageMsg.header.stamp.fromNSec(tn);
+      pCameradata->imageMsg.header.seq = pCameradata->frame_id;
+      pCameradata->imageMsg.header.frame_id = pCameradata->config.frame_id;
+      pCameradata->imageMsg.width = pCameradata->widthRoi;
+      pCameradata->imageMsg.height = pCameradata->heightRoi;
+      pCameradata->imageMsg.encoding = pCameradata->pszPixelformat;
+      pCameradata->imageMsg.step = pCameradata->imageMsg.width * pCameradata->nBytesPixel;
+      pCameradata->imageMsg.data = this_data;
 
       // get current CameraInfo data
       pCameradata->camerainfo = pCameradata->pCameraInfoManager->getCameraInfo();
-      pCameradata->camerainfo.header.stamp = msg.header.stamp;
-      pCameradata->camerainfo.header.seq = msg.header.seq;
-      pCameradata->camerainfo.header.frame_id = msg.header.frame_id;
+      pCameradata->camerainfo.header.stamp = pCameradata->imageMsg.header.stamp;
+      pCameradata->camerainfo.header.seq = pCameradata->imageMsg.header.seq;
+      pCameradata->camerainfo.header.frame_id = pCameradata->imageMsg.header.frame_id;
       pCameradata->camerainfo.width = pCameradata->widthRoi;
       pCameradata->camerainfo.height = pCameradata->heightRoi;
+      pCameradata->isNewImage = true;
 
-      pCameradata->publisher.publish(msg, pCameradata->camerainfo);
+      pCameradata->publisher.publish(pCameradata->imageMsg, pCameradata->camerainfo);
     }
     else
       ROS_WARN("Frame error: %s",
@@ -415,11 +417,6 @@ static gboolean PeriodicTask_callback(void* applicationdata)
 
   if (global.bCancel || !ros::ok())
   {
-    for(auto &camera : global.cameras)
-    {
-      if(camera.second.isRunning == true)
-        arv_device_execute_command(camera.second.pDevice, "AcquisitionStop");
-    }
     g_main_loop_quit(pData->main_loop);
     return FALSE;
   }
@@ -807,6 +804,54 @@ void print_genicam_info(const std::string &camera_serial)
 
 }
 
+// service callbacks
+bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::CaptureResponse& response, std::unordered_map<std::string, GeniCam>& cameras)
+{
+  for(auto& serial : request.serials)
+  {
+    auto iter = cameras.find(serial);
+    try
+    {
+      if(!iter->second.isImplementedTriggerMode || !iter->second.isImplementedTriggerSource)
+      {
+        std::runtime_error("Cature Service: can not be used because software and hardware triggering is not supported by camera with serial number: " + serial);
+      }
+      if(iter != cameras.end())
+      {
+        if(iter->second.isStreaming)
+        {
+          arv_device_execute_command(iter->second.pDevice,
+                                   "AcquisitionStop");
+        }
+
+        arv_device_set_string_feature_value (iter->second.pDevice, "TriggerMode", "SingleFrame");
+        arv_device_set_string_feature_value (iter->second.pDevice, "TriggerSource", "Software");
+
+        arv_device_execute_command(iter->second.pDevice,
+                                 "AcquisitionStart");
+
+        iter->second.isNewImage = false;
+        arv_device_execute_command (global.pDevice, "TriggerSoftware");
+        while(!iter->second.isNewImage);
+      }
+      else
+      {
+        std::runtime_error("Cature Service: request image from not available camera with serial: " + serial);
+      }
+
+    } catch(const std::exception& e)
+    {
+      ROS_WARN(e.what());
+      response.images.clear();
+      response.serials.clear();
+      return false;
+    }
+
+  }
+
+  return true;
+}
+
 int main(int argc, char** argv)
 {
   ApplicationData applicationdata;
@@ -953,64 +998,24 @@ int main(int argc, char** argv)
           arv_device_execute_command(global.cameras[camera_serial.first].pDevice,
                                      "AcquisitionStart");
 
-          global.cameras[camera_serial.first].isRunning = true;
+          global.cameras[camera_serial.first].isReady = true;
         } catch (const std::exception& e)
         {
           ROS_WARN(e.what());
-          global.cameras[camera_serial.first].isRunning = false;
+          global.cameras[camera_serial.first].isReady = false;
           continue;
         }
       }
     }
 
-
-
     //WriteCameraFeaturesFromRosparam();
 
-    /*
-#ifdef TUNING
-    ros::Publisher pubInt64 = global.phNode->advertise<std_msgs::Int64>(
-        ros::this_node::getName() + "/dt", 100);
-    global.ppubInt64 = &pubInt64;
-#endif
-*/
     // Start the camerainfo manager.
-    /*std::string camera_info_url;
-    if (!pnh.getParam("url", camera_info_url))
-    {
-      ROS_ERROR(
-          "ros parameter url not set in camnode where's the camera_info file?");
-    }
-    global.pCameraInfoManager = new camera_info_manager::CameraInfoManager(
-        ros::NodeHandle(ros::this_node::getName()),
-        arv_device_get_string_feature_value(global.pDevice, "DeviceID"),
-        camera_info_url);
-     */
-    // Start the dynamic_reconfigure server.
-    //
-    //dynamic_reconfigure::Server<Config>::CallbackType reconfigureCallback;
-
-    //reconfigureCallback = boost::bind(&RosReconfigure_callback, _1, _2);
-    //reconfigureServer.setCallback(reconfigureCallback);
-    //ros::Duration(2.0).sleep();
-
-    // Get parameter current values.
-
-
-    //		// Print the tree of camera features, with their values.
-    //		ROS_INFO ("
-    //----------------------------------------------------------------------------------");
-    //		NODEEX		 nodeex;
-    //		ArvGc	*pGenicam=0;
-    //		pGenicam = arv_device_get_genicam(global.pDevice);
-    //
-    //		nodeex.szName = "Root";
-    //		nodeex.pNode = (ArvDomNode	*)arv_gc_get_node(pGenicam,
-    //nodeex.szName);
-    //		nodeex.pNodeSibling = NULL;
-    //		PrintDOMTree(pGenicam, nodeex, 0);
-    //		ROS_INFO ("
-    //----------------------------------------------------------------------------------");
+    //std::string camera_info_url;
+    ros::ServiceServer serviceServer =
+        global.phNode->advertiseService<camera_aravis::CaptureRequest,
+                                        camera_aravis::CaptureResponse>
+        ("capture", std::bind(&capture_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
 
     applicationdata.main_loop = 0;
 
@@ -1021,7 +1026,6 @@ int main(int argc, char** argv)
 
     applicationdata.main_loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(applicationdata.main_loop);
-    std::cout<<"Test one"<<std::endl;
 
     if (global.idSoftwareTriggerTimer)
     {
@@ -1032,11 +1036,10 @@ int main(int argc, char** argv)
     signal(SIGINT, pSigintHandlerOld);
 
     g_main_loop_unref(applicationdata.main_loop);
-    std::cout<<"Test two"<<std::endl;
+
     for(auto &camera : global.cameras)
     {
-      std::cout<<"Test three"<<std::endl;
-      if(camera.second.isRunning == true)
+      if(camera.second.isReady == true)
       {
         std::cout<<"Test four"<<std::endl;
         guint64 n_completed_buffers;
@@ -1054,6 +1057,9 @@ int main(int argc, char** argv)
         ROS_INFO("Resent buffers    = %Lu", (unsigned long long)n_resent);
         ROS_INFO("Missing           = %Lu", (unsigned long long)n_missing);
 
+
+        arv_device_execute_command(global.cameras[camera.first].pDevice,
+                                   "AcquisitionStop");
 
         camera.second.publisher.shutdown();
         g_object_unref(camera.second.pStream);

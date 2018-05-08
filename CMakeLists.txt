@@ -7,9 +7,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 project(camera_aravis)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules)
-find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs image_transport camera_info_manager)
+find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs image_transport camera_info_manager genmsg)
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
+
+add_service_files(
+  DIRECTORY srv
+  FILES
+  Capture.srv
+  GetConnectedDevice.srv
+  SendCommand.srv
+)
+
+generate_messages(
+   DEPENDENCIES
+   sensor_msgs
+)
 
 catkin_package(
     DEPENDS Aravis GLIB2
@@ -22,7 +35,7 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB
 
 message(${ARAVIS_LIBRARY})
 
-add_executable(camnode src/camnode.cpp)
+add_executable(${Project}_node src/camnode.cpp)
 
-target_link_libraries(camnode ${catkin_LIBRARIES} ${ARAVIS_LIBRARY} glib-2.0 gmodule-2.0 gobject-2.0)
-add_dependencies(camnode ${PROJECT_NAME}_gencfg)
+target_link_libraries(${Project}_node ${catkin_LIBRARIES} ${ARAVIS_LIBRARY} glib-2.0 gmodule-2.0 gobject-2.0)
+add_dependencies(${Project}_node ${PROJECT_NAME}_gencfg)
