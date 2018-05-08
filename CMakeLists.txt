@@ -7,19 +7,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 project(camera_aravis)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules)
-find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs image_transport camera_info_manager dynamic_reconfigure tf dynamic_reconfigure)
+find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs image_transport camera_info_manager)
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
 
-generate_dynamic_reconfigure_options(cfg/CameraAravisConfig.cfg)
 catkin_package(
     DEPENDS Aravis GLIB2
-    CATKIN_DEPENDS roscpp sensor_msgs image_transport camera_info_manager dynamic_reconfigure tf
+    CATKIN_DEPENDS roscpp sensor_msgs image_transport camera_info_manager
     INCLUDE_DIRS include
     LIBRARIES
 )
 
-include_directories(include cfg/cpp ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB2_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB2_INCLUDE_DIRS})
 
 message(${ARAVIS_LIBRARY})
 
