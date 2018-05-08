@@ -80,9 +80,9 @@ struct GeniCam
 {
   bool isRunning;
 
-  std::unique_ptr<image_transport::ImageTransport> pTransport;
+  std::shared_ptr<image_transport::ImageTransport> pTransport;
   image_transport::CameraPublisher publisher;
-  std::unique_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
+  std::shared_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
   sensor_msgs::CameraInfo camerainfo;
 
   // aravis g_objects
@@ -137,7 +137,7 @@ struct GeniCam
 
 struct Global
 {
-  std::unique_ptr<ros::NodeHandle> phNode;
+  std::shared_ptr<ros::NodeHandle> phNode;
   int idSoftwareTriggerTimer;
   gboolean bCancel;
 
@@ -1062,7 +1062,7 @@ int main(int argc, char** argv)
   global.idSoftwareTriggerTimer = 0;
 
   ros::init(argc, argv, "camera_aravis_node");
-  global.phNode.reset(new ros::NodeHandle());
+  global.phNode = std::make_shared<ros::NodeHandle>();
 
   // declaring SW trigger service
   ros::ServiceServer trigger_service = global.phNode->advertiseService(
@@ -1156,9 +1156,9 @@ int main(int argc, char** argv)
           print_genicam_info(camera_serial.first);
 
           std::string name = ros::this_node::getName()+"/"+camera_serial.first;
-          global.cameras[camera_serial.first].pCameraInfoManager.reset(new camera_info_manager::CameraInfoManager(
+          global.cameras[camera_serial.first].pCameraInfoManager= std::make_shared<camera_info_manager::CameraInfoManager>(
                                                                              ros::NodeHandle(name),
-                                                                             camera_serial.first));
+                                                                             camera_serial.first);
 
           ROS_INFO("Opened: %s-%s", arv_device_get_string_feature_value(
                                     global.cameras[camera_serial.first].pDevice, "DeviceVendorName"),
@@ -1173,19 +1173,19 @@ int main(int argc, char** argv)
           }
 
           // Set up image_raw.
-          global.cameras[camera_serial.first].pTransport.reset(new image_transport::ImageTransport(*global.phNode));
+          global.cameras[camera_serial.first].pTransport = std::make_shared<image_transport::ImageTransport>(*global.phNode);
           global.cameras[camera_serial.first].publisher = global.cameras[camera_serial.first].pTransport->advertiseCamera(
               ros::this_node::getName() + "/" + camera_serial.first + "/image_raw", 1);
 
           // Connect signals with callbacks.
-          //g_signal_connect(global.cameras[camera_serial.first].pStream,
-          //                 "new-buffer", G_CALLBACK(NewBuffer_callback),
-          //                 &global.cameras[camera_serial.first]);
+          g_signal_connect(global.cameras[camera_serial.first].pStream,
+                           "new-buffer", G_CALLBACK(NewBuffer_callback),
+                           &global.cameras[camera_serial.first]);
           g_signal_connect(global.cameras[camera_serial.first].pDevice, "control-lost",
                            G_CALLBACK(ControlLost_callback), NULL);
 
-          //arv_stream_set_emit_signals(
-          //      (ArvStream*)global.cameras[camera_serial.first].pStream, TRUE);
+          arv_stream_set_emit_signals(
+                (ArvStream*)global.cameras[camera_serial.first].pStream, TRUE);
 
           arv_device_execute_command(global.cameras[camera_serial.first].pDevice,
                                      "AcquisitionStart");
@@ -1267,7 +1267,7 @@ int main(int argc, char** argv)
 
     signal(SIGINT, pSigintHandlerOld);
 
-    std::cout<<"Test one"<<std::endl;
+    std::cout<<"Test six"<<std::endl;
     g_main_loop_unref(applicationdata.main_loop);
     std::cout<<"Test two"<<std::endl;
     for(auto &camera : global.cameras)
