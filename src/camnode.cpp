@@ -159,7 +159,17 @@ const char* szBufferStatusFromInt[] = {
     "ARV_BUFFER_STATUS_WRONG_PACKET_ID", "ARV_BUFFER_STATUS_SIZE_MISMATCH",
     "ARV_BUFFER_STATUS_FILLING",         "ARV_BUFFER_STATUS_ABORTED"};
 
-static void set_cancel(int signal) { global.bCancel = TRUE; }
+static void set_cancel(int signal){ global.bCancel = TRUE; }
+
+
+static void stream_cb (void *user_data, ArvStreamCallbackType type, ArvBuffer *buffer)
+{
+  if (type == ARV_STREAM_CALLBACK_TYPE_INIT) {
+    if (!arv_make_thread_realtime (10) &&
+        !arv_make_thread_high_priority (-10))
+      g_warning ("Failed to make stream thread high priority");
+  }
+}
 
 ArvGvStream* CreateStream(const std::string &camera_serial)
 {
@@ -169,7 +179,7 @@ ArvGvStream* CreateStream(const std::string &camera_serial)
   unsigned int timeoutFrameRetention = 200;
 
   ArvGvStream* pStream =
-      (ArvGvStream*)arv_device_create_stream(global.cameras[camera_serial].pDevice, NULL, NULL);
+      (ArvGvStream*)arv_device_create_stream(global.cameras[camera_serial].pDevice, stream_cb, NULL);
   if (pStream)
   {
     ArvBuffer* pBuffer;
@@ -671,7 +681,10 @@ static gboolean PeriodicTask_callback(void* applicationdata)
     return FALSE;
   }
 
-  ros::spinOnce();
+  if(ros::ok)
+  {
+    ros::spinOnce();
+  }
 
   return TRUE;
 } // PeriodicTask_callback()
@@ -1062,7 +1075,8 @@ int main(int argc, char** argv)
   global.idSoftwareTriggerTimer = 0;
 
   ros::init(argc, argv, "camera_aravis_node");
-  global.phNode = std::make_shared<ros::NodeHandle>();
+
+  global.phNode = std::make_shared<ros::NodeHandle>("~");
 
   // declaring SW trigger service
   ros::ServiceServer trigger_service = global.phNode->advertiseService(
@@ -1293,6 +1307,8 @@ int main(int argc, char** argv)
 
         arv_device_execute_command(camera.second.pDevice, "AcquisitionStop");
 
+        camera.second.publisher.shutdown();
+
         g_object_unref(camera.second.pStream);
         g_object_unref(camera.second.pCamera);
       }
@@ -1300,6 +1316,13 @@ int main(int argc, char** argv)
   }
   else
     ROS_ERROR("No cameras detected.");
+
+  global.cameras.clear();
+  ros::shutdown();
+  while(ros::ok())
+  {
+    ros::spinOnce();
+  }
 
   return 0;
 } // main()
