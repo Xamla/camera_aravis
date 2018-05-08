@@ -200,6 +200,16 @@ const char* szBufferStatusFromInt[] = {
 
 static void set_cancel(int signal) { global.bCancel = TRUE; }
 
+
+static void stream_cb (void *user_data, ArvStreamCallbackType type, ArvBuffer *buffer)
+{
+  if (type == ARV_STREAM_CALLBACK_TYPE_INIT) {
+    if (!arv_make_thread_realtime (10) &&
+        !arv_make_thread_high_priority (-10))
+      g_warning ("Failed to make stream thread high priority");
+  }
+}
+
 ArvGvStream* CreateStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
@@ -208,7 +218,7 @@ ArvGvStream* CreateStream(const std::string &camera_serial)
   unsigned int timeoutFrameRetention = 200;
 
   ArvGvStream* pStream =
-      (ArvGvStream*)arv_device_create_stream(global.cameras[camera_serial].pDevice, NULL, NULL);
+      (ArvGvStream*)arv_device_create_stream(global.cameras[camera_serial].pDevice, stream_cb, NULL);
   if (pStream)
   {
     ArvBuffer* pBuffer;
@@ -403,7 +413,7 @@ static gboolean PeriodicTask_callback(void* applicationdata)
 {
   ApplicationData *pData = (ApplicationData*)applicationdata;
 
-  if (global.bCancel)
+  if (global.bCancel || !ros::ok())
   {
     for(auto &camera : global.cameras)
     {
@@ -414,7 +424,7 @@ static gboolean PeriodicTask_callback(void* applicationdata)
     return FALSE;
   }
 
-  //ros::spinOnce();
+  ros::spinOnce();
 
   return TRUE;
 } // PeriodicTask_callback()
@@ -1004,7 +1014,7 @@ int main(int argc, char** argv)
 
     applicationdata.main_loop = 0;
 
-    g_timeout_add_seconds(1, PeriodicTask_callback, &applicationdata);
+    g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
     void (*pSigintHandlerOld)(int);
     pSigintHandlerOld = signal(SIGINT, set_cancel);
@@ -1044,6 +1054,8 @@ int main(int argc, char** argv)
         ROS_INFO("Resent buffers    = %Lu", (unsigned long long)n_resent);
         ROS_INFO("Missing           = %Lu", (unsigned long long)n_missing);
 
+
+        camera.second.publisher.shutdown();
         g_object_unref(camera.second.pStream);
         g_object_unref(camera.second.pCamera);
       }
@@ -1052,5 +1064,12 @@ int main(int argc, char** argv)
   else
     ROS_ERROR("No cameras detected.");
 
+  global.cameras.clear();
+
+  ros::shutdown();
+  while(ros::ok())
+  {
+    ros::spinOnce();
+  }
   return 0;
 } // main()
