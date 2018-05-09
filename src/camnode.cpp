@@ -867,6 +867,8 @@ int main(int argc, char** argv)
 
     // Start the camerainfo manager.
     //std::string camera_info_url;
+
+    /*
     ros::ServiceServer captureServiceServer =
         global.phNode->advertiseService<camera_aravis::CaptureRequest,
                                         camera_aravis::CaptureResponse>
@@ -875,7 +877,8 @@ int main(int argc, char** argv)
     ros::ServiceServer getConnectedDevicesServiceServer =
         global.phNode->advertiseService<camera_aravis::GetConnectedDevicesRequest,
                                         camera_aravis::GetConnectedDevicesResponse>
-        ("getconnecteddevice", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
+        ("getconnecteddevices", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
+        */
 
     g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
@@ -892,12 +895,6 @@ int main(int argc, char** argv)
     }
 
     signal(SIGINT, pSigintHandlerOld);
-
-    captureServiceServer.shutdown();
-    getConnectedDevicesServiceServer.shutdown();
-
-    captureServiceServer.~ServiceServer();
-    getConnectedDevicesServiceServer.~ServiceServer();
 
     g_main_loop_unref(applicationdata.main_loop);
 
