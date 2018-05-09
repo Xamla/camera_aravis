@@ -1,6 +1,8 @@
 #ifndef GENICAM_H
 #define GENICAM_H
 
+#include <unordered_map>
+
 #include <ros/ros.h>
 #include <glib.h>
 #include <arv.h>
@@ -10,6 +12,8 @@
 #include <camera_info_manager/camera_info_manager.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
+
+enum State{CREATED,LOST_CONNECTION,READY,STREAMING};
 
 struct Config
 {
@@ -47,6 +51,7 @@ struct GeniCam
 {
   bool isReady;
   bool isStreaming;
+  State state;
   bool isNewImage;
 
   std::shared_ptr<image_transport::ImageTransport> pTransport;

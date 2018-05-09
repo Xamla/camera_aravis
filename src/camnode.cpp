@@ -29,7 +29,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <algorithm>
 #include <functional>
 
@@ -294,6 +293,39 @@ static gboolean PeriodicTask_callback(void* applicationdata)
 
   if (global.bCancel || !ros::ok())
   {
+    for(auto &camera : global.cameras)
+    {
+      if(camera.second.state == State::READY)
+      {
+        std::cout<<"Test four"<<std::endl;
+        guint64 n_completed_buffers;
+        guint64 n_failures;
+        guint64 n_underruns;
+        guint64 n_resent;
+        guint64 n_missing;
+        arv_stream_get_statistics((ArvStream*)camera.second.pStream, &n_completed_buffers,
+                                  &n_failures, &n_underruns);
+        ROS_INFO("Completed buffers = %Lu",
+                 (unsigned long long)n_completed_buffers);
+        ROS_INFO("Failures          = %Lu", (unsigned long long)n_failures);
+        ROS_INFO("Underruns         = %Lu", (unsigned long long)n_underruns);
+        arv_gv_stream_get_statistics(camera.second.pStream, &n_resent, &n_missing);
+        ROS_INFO("Resent buffers    = %Lu", (unsigned long long)n_resent);
+        ROS_INFO("Missing           = %Lu", (unsigned long long)n_missing);
+
+
+        arv_device_execute_command(global.cameras[camera.first].pDevice,
+                                   "AcquisitionStop");
+
+        camera.second.publisher.shutdown();
+        g_object_unref(camera.second.pStream);
+        g_object_unref(camera.second.pCamera);
+      }
+
+      if(ros::ok())
+        ros::spinOnce();
+    }
+
     g_main_loop_quit(pData->main_loop);
     return FALSE;
   }
@@ -686,6 +718,7 @@ void print_genicam_info(const std::string &camera_serial)
 int main(int argc, char** argv)
 {
   ApplicationData applicationdata;
+  applicationdata.main_loop = 0;
   int nInterfaces = 0;
   int nDevices = 0;
   int i = 0;
@@ -694,11 +727,6 @@ int main(int argc, char** argv)
   global.idSoftwareTriggerTimer = 0;
 
   ros::init(argc, argv, "camera_aravis_node");
-
-  ros::AsyncSpinner spinner(1);
-
-  spinner.stop();
-
   global.phNode = std::make_shared<ros::NodeHandle>("~");
   //dynamic_reconfigure::Server<Config> reconfigureServer;
 
@@ -825,11 +853,11 @@ int main(int argc, char** argv)
           arv_device_execute_command(global.cameras[camera_serial.first].pDevice,
                                      "AcquisitionStart");
 
-          global.cameras[camera_serial.first].isReady = true;
+          global.cameras[camera_serial.first].state = State::STREAMING;
         } catch (const std::exception& e)
         {
           ROS_WARN(e.what());
-          global.cameras[camera_serial.first].isReady = false;
+          global.cameras[camera_serial.first].isReady = State::CREATED;
           continue;
         }
       }
@@ -839,12 +867,15 @@ int main(int argc, char** argv)
 
     // Start the camerainfo manager.
     //std::string camera_info_url;
-    ros::ServiceServer serviceServer =
+    ros::ServiceServer captureServiceServer =
         global.phNode->advertiseService<camera_aravis::CaptureRequest,
                                         camera_aravis::CaptureResponse>
         ("capture", std::bind(&capture_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
 
-    applicationdata.main_loop = 0;
+    ros::ServiceServer getConnectedDevicesServiceServer =
+        global.phNode->advertiseService<camera_aravis::GetConnectedDevicesRequest,
+                                        camera_aravis::GetConnectedDevicesResponse>
+        ("getconnecteddevice", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
 
     g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
@@ -862,37 +893,14 @@ int main(int argc, char** argv)
 
     signal(SIGINT, pSigintHandlerOld);
 
+    captureServiceServer.shutdown();
+    getConnectedDevicesServiceServer.shutdown();
+
+    captureServiceServer.~ServiceServer();
+    getConnectedDevicesServiceServer.~ServiceServer();
+
     g_main_loop_unref(applicationdata.main_loop);
 
-    for(auto &camera : global.cameras)
-    {
-      if(camera.second.isReady == true)
-      {
-        std::cout<<"Test four"<<std::endl;
-        guint64 n_completed_buffers;
-        guint64 n_failures;
-        guint64 n_underruns;
-        guint64 n_resent;
-        guint64 n_missing;
-        arv_stream_get_statistics((ArvStream*)camera.second.pStream, &n_completed_buffers,
-                                  &n_failures, &n_underruns);
-        ROS_INFO("Completed buffers = %Lu",
-                 (unsigned long long)n_completed_buffers);
-        ROS_INFO("Failures          = %Lu", (unsigned long long)n_failures);
-        ROS_INFO("Underruns         = %Lu", (unsigned long long)n_underruns);
-        arv_gv_stream_get_statistics(camera.second.pStream, &n_resent, &n_missing);
-        ROS_INFO("Resent buffers    = %Lu", (unsigned long long)n_resent);
-        ROS_INFO("Missing           = %Lu", (unsigned long long)n_missing);
-
-
-        arv_device_execute_command(global.cameras[camera.first].pDevice,
-                                   "AcquisitionStop");
-
-        camera.second.publisher.shutdown();
-        g_object_unref(camera.second.pStream);
-        g_object_unref(camera.second.pCamera);
-      }
-    }
   }
   else
     ROS_ERROR("No cameras detected.");

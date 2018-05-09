@@ -6,14 +6,29 @@
 #include <vector>
 
 #include <camera_aravis/Capture.h>
-#include <camera_aravis/GetConnectedDevice.h>
+#include <camera_aravis/GetConnectedDevices.h>
 #include <camera_aravis/SendCommand.h>
 
 
 #include "camera_aravis/genicam.h"
 
+void restoreAquistionsMode(std::unordered_map<std::string, GeniCam>::iterator& iter, bool& wasStreaming)
+{
+  arv_device_execute_command(iter->second.pDevice, "AcquisitionStop");
+  arv_device_set_string_feature_value (iter->second.pDevice, "AcquisitionMode", "Continuous");
+  arv_device_set_string_feature_value (iter->second.pDevice, "TriggerMode", "Off");
+
+  if(wasStreaming)
+  {
+    arv_device_execute_command(iter->second.pDevice,
+                             "AcquisitionStart");
+  }
+}
+
 // service callbacks
-bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::CaptureResponse& response, std::unordered_map<std::string, GeniCam>& cameras)
+bool capture_callback(camera_aravis::CaptureRequest& request,
+                      camera_aravis::CaptureResponse& response,
+                      std::unordered_map<std::string, GeniCam>& cameras)
 {
   for(auto& serial : request.serials)
   {
@@ -26,13 +41,15 @@ bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::Cap
          !iter->second.isImplementedTriggerSource ||
          !iter->second.isImplementedAcquisitionMode)
       {
-        std::runtime_error("Cature Service: can not be used because software and hardware triggering is not supported by camera with serial number: " + serial);
+        std::runtime_error("Cature Service: can not be used because "
+                           "software and hardware triggering is not "
+                           "supported by camera with serial number: " + serial);
       }
 
       if(iter != cameras.end())
       {
         changedTriggerProperties = true;
-        if(iter->second.isStreaming)
+        if(iter->second.state == State::STREAMING)
         {
           wasStreaming = true;
           arv_device_execute_command(iter->second.pDevice,
@@ -61,33 +78,28 @@ bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::Cap
           }
           else
           {
-            throw std::runtime_error("Cature Service: after 3 times the exposure time a new image was still not available abort; serial: " + serial);
+            throw std::runtime_error("Cature Service: after 3 times the "
+                                     "exposure time a new image was still "
+                                     "not available abort; serial: " + serial);
           }
         }
 
         response.serials.push_back(serial);
         response.images.push_back(iter->second.imageMsg);
+
+        restoreAquistionsMode(iter, wasStreaming);
       }
       else
       {
-        std::runtime_error("Cature Service: request image from not available camera with serial: " + serial);
+        std::runtime_error("Cature Service: request image from "
+                           "not available camera with serial: " + serial);
       }
 
     } catch(const std::exception& e)
     {
       if(changedTriggerProperties)
       {
-        arv_device_execute_command(iter->second.pDevice,
-                               "AcquisitionStop");
-
-        arv_device_set_string_feature_value (iter->second.pDevice, "AcquisitionMode", "Continuous");
-        arv_device_set_string_feature_value (iter->second.pDevice, "TriggerMode", "Off");
-
-        if(wasStreaming)
-        {
-          arv_device_execute_command(iter->second.pDevice,
-                                   "AcquisitionStart");
-        }
+        restoreAquistionsMode(iter, wasStreaming);
       }
 
       ROS_WARN(e.what());
@@ -98,6 +110,22 @@ bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::Cap
 
   }
 
+  return true;
+}
+
+
+bool getConnectedDevices_callback(camera_aravis::GetConnectedDevicesRequest& request,
+                                 camera_aravis::GetConnectedDevicesResponse& response,
+                                 std::unordered_map<std::string, GeniCam>& cameras)
+{
+  for(auto& camera : cameras)
+  {
+    if(camera.second.state == State::READY ||
+       camera.second.state == State::STREAMING)
+    {
+      response.serials.push_back(camera.first);
+    }
+  }
   return true;
 }
 
