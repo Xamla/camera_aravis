@@ -29,31 +29,21 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include <vector>
 #include <unordered_map>
 #include <algorithm>
 #include <functional>
-#include <utility>
+
 #include <stdlib.h>
 #include <math.h>
 
-#include <glib.h>
-
 #include <ros/time.h>
 #include <ros/duration.h>
-#include <sensor_msgs/Image.h>
-#include <std_msgs/Int64.h>
+
 #include <sensor_msgs/image_encodings.h>
-#include <image_transport/image_transport.h>
-#include <camera_info_manager/camera_info_manager.h>
 
-#include <camera_aravis/Capture.h>
-#include <camera_aravis/GetConnectedDevice.h>
-#include <camera_aravis/SendCommand.h>
-
-//#include "camera_aravis/SoftwareTrigger.h"
-#include <std_srvs/Empty.h>
-#include "camera_aravis/DOMTreeHelper.h"
+#include "camera_aravis/domtreehelper.h"
+#include "camera_aravis/servicecallbacks.h"
+#include "camera_aravis/genicam.h"
 #include "XmlRpc.h"
 
 //#define TUNING	// Allows tuning the gains for the timestamp controller.
@@ -70,113 +60,8 @@
   (((pixel_format) >> 16) & 0xff)
 #define ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(pixel_format)                          \
   ((((pixel_format) >> 16) & 0xff) >> 3)
-//typedef camera_aravis::CameraAravisConfig Config;
-
-// static gboolean SoftwareTrigger_callback (void *);
-bool SoftwareTrigger_callback(std_srvs::Empty::Request& request,
-                              std_srvs::Empty::Response& response);
 
 // Global variables -------------------
-
-struct Config
-{
-  Config()
-  {
-    Acquire = true;
-    ExposureAuto = "Off";
-    GainAuto = "Off";
-    ExposureTimeAbs = 2000.0;
-    Gain = 1.0;
-    AcquisitionMode = "Continous";
-    AcquisitionFrameRate = 20.0;
-    TriggerMode = "Off";
-    TriggerSource = "Line1";
-    FocusPos = 32767;
-    frame_id = "camera";
-    mtu = 576;
-  }
-
-  bool Acquire;
-  std::string ExposureAuto;
-  std::string GainAuto;
-  double ExposureTimeAbs;
-  double Gain;
-  std::string AcquisitionMode;
-  double AcquisitionFrameRate;
-  std::string TriggerMode;
-  std::string TriggerSource;
-  int FocusPos;
-  std::string frame_id;
-  int mtu;
-};
-
-struct GeniCam
-{
-  bool isReady;
-  bool isStreaming;
-  bool isNewImage;
-
-  std::shared_ptr<image_transport::ImageTransport> pTransport;
-  image_transport::CameraPublisher publisher;
-  std::unique_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
-  sensor_msgs::CameraInfo camerainfo;
-  sensor_msgs::Image imageMsg;
-
-  // aravis g_objects
-  ArvCamera* pCamera;
-  ArvDevice* pDevice;
-  ArvGvStream* pStream;
-
-  gint width, height; // buffer->width and buffer->height not working, so I used
-                      // a global.
-  Config config;
-  Config configMin;
-  Config configMax;
-
-  int isImplementedAcquisitionFrameRate;
-  int isImplementedAcquisitionFrameRateEnable;
-  int isImplementedGain;
-  int isImplementedExposureTimeAbs;
-  int isImplementedExposureAuto;
-  int isImplementedGainAuto;
-  int isImplementedFocusPos;
-  int isImplementedTriggerSelector;
-  int isImplementedTriggerSource;
-  int isImplementedTriggerMode;
-  int isImplementedAcquisitionMode;
-  int isImplementedMtu;
-
-  int xRoi;
-  int yRoi;
-  int widthRoi;
-  int widthRoiMin;
-  int widthRoiMax;
-  int heightRoi;
-  int heightRoiMin;
-  int heightRoiMax;
-
-  int widthSensor;
-  int heightSensor;
-
-  const char* pszPixelformat;
-  unsigned nBytesPixel;
-  int mtu;
-  int Acquire;
-  const char* keyAcquisitionFrameRate;
-
-  size_t frame_id;
-  size_t nBuffers; // Counter for Hz calculation.
-
-  // time compensation related things
-  uint64_t cm = 0L; // Camera time prev
-  uint64_t tm = 0L; // Calculated image time prev
-  int64_t em = 0L; // Error prev.
-
-#ifdef TUNING
-  std::unique_ptr<ros::Publisher> ppubInt64;
-#endif
-
-};
 
 struct Global
 {
@@ -400,14 +285,6 @@ static void ControlLost_callback(ArvGvDevice* pGvDevice)
 
 //     return TRUE;
 // }
-
-bool SoftwareTrigger_callback(std_srvs::Empty::Request& request,
-                              std_srvs::Empty::Response& response)
-{
-  //arv_camera_software_trigger(global.cameras[camera_serial].pCamera);
-  ROS_INFO("Execueting Trigger");
-  return true;
-}
 
 // PeriodicTask_callback()
 // Check for termination, and spin for ROS.
@@ -804,53 +681,7 @@ void print_genicam_info(const std::string &camera_serial)
 
 }
 
-// service callbacks
-bool capture_callback(camera_aravis::CaptureRequest& request, camera_aravis::CaptureResponse& response, std::unordered_map<std::string, GeniCam>& cameras)
-{
-  for(auto& serial : request.serials)
-  {
-    auto iter = cameras.find(serial);
-    try
-    {
-      if(!iter->second.isImplementedTriggerMode || !iter->second.isImplementedTriggerSource)
-      {
-        std::runtime_error("Cature Service: can not be used because software and hardware triggering is not supported by camera with serial number: " + serial);
-      }
-      if(iter != cameras.end())
-      {
-        if(iter->second.isStreaming)
-        {
-          arv_device_execute_command(iter->second.pDevice,
-                                   "AcquisitionStop");
-        }
 
-        arv_device_set_string_feature_value (iter->second.pDevice, "TriggerMode", "SingleFrame");
-        arv_device_set_string_feature_value (iter->second.pDevice, "TriggerSource", "Software");
-
-        arv_device_execute_command(iter->second.pDevice,
-                                 "AcquisitionStart");
-
-        iter->second.isNewImage = false;
-        arv_device_execute_command (global.pDevice, "TriggerSoftware");
-        while(!iter->second.isNewImage);
-      }
-      else
-      {
-        std::runtime_error("Cature Service: request image from not available camera with serial: " + serial);
-      }
-
-    } catch(const std::exception& e)
-    {
-      ROS_WARN(e.what());
-      response.images.clear();
-      response.serials.clear();
-      return false;
-    }
-
-  }
-
-  return true;
-}
 
 int main(int argc, char** argv)
 {
@@ -868,12 +699,8 @@ int main(int argc, char** argv)
 
   spinner.stop();
 
-  global.phNode = std::make_shared<ros::NodeHandle>();
+  global.phNode = std::make_shared<ros::NodeHandle>("~");
   //dynamic_reconfigure::Server<Config> reconfigureServer;
-
-  // declaring SW trigger service
-  ros::ServiceServer trigger_service = global.phNode->advertiseService(
-      "trigger_acquisition", SoftwareTrigger_callback);
 
 #if !GLIB_CHECK_VERSION(2, 35, 0)
   g_type_init();
