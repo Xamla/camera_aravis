@@ -718,7 +718,6 @@ void print_genicam_info(const std::string &camera_serial)
 int main(int argc, char** argv)
 {
   ApplicationData applicationdata;
-  applicationdata.main_loop = 0;
   int nInterfaces = 0;
   int nDevices = 0;
   int i = 0;
@@ -728,6 +727,10 @@ int main(int argc, char** argv)
 
   ros::init(argc, argv, "camera_aravis_node");
   global.phNode = std::make_shared<ros::NodeHandle>("~");
+
+  ros::AsyncSpinner spinner(1);
+  spinner.stop();
+
   //dynamic_reconfigure::Server<Config> reconfigureServer;
 
 #if !GLIB_CHECK_VERSION(2, 35, 0)
@@ -885,6 +888,7 @@ int main(int argc, char** argv)
     void (*pSigintHandlerOld)(int);
     pSigintHandlerOld = signal(SIGINT, set_cancel);
 
+    applicationdata.main_loop = 0;
     applicationdata.main_loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(applicationdata.main_loop);
 
