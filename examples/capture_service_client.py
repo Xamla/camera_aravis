@@ -9,6 +9,17 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from camera_aravis.srv import *
 
+def call_getconnecteddevices_service():
+  rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
+  try:
+    getSerials = rospy.ServiceProxy('camera_aravis_node/getconnecteddevices', GetConnectedDevices)
+    resp = getSerials()
+    
+    return resp.serials
+
+  except rospy.ServiceException, e:
+    print "Service call failed: %s"%e
+
 class capture_client:
   def __init__(self):
     self.bridge = CvBridge()
@@ -33,7 +44,16 @@ class capture_client:
 
 def main():
   client = capture_client()
-  client.call_capture_service(['4103235743','4103217455'])
+
+  serials = call_getconnecteddevices_service()
+
+  if len(serials)>1:
+    print('request image from following cameras:')
+    for serial in serials:
+      print('Camera with serial number: ' + str(serial))
+    client.call_capture_service(serials)
+  else:
+    print('no cameras are available')
 
 if __name__ == "__main__":
   main()

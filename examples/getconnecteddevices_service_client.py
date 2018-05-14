@@ -15,7 +15,7 @@ def call_getconnecteddevices_service():
     print('Number of connected cameras: ' + str(len(resp.serials)))
 
     for serial in resp.serials:
-      print('Camera ID: ' + str(serial))
+      print('Camera serial number: ' + str(serial))
 
   except rospy.ServiceException, e:
     print "Service call failed: %s"%e
