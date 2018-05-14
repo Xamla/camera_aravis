@@ -49,14 +49,26 @@ struct Config
 
 struct GeniCam
 {
-  bool isReady;
-  bool isStreaming;
+  GeniCam() = default;
+  GeniCam(const GeniCam&) = default;
+
+  ~GeniCam()
+  {
+    arv_device_execute_command(pDevice,
+                               "AcquisitionStop");
+
+    publisher.shutdown();
+    g_object_unref(pStream);
+    g_object_unref(pCamera);
+  }
+
+
   State state;
   bool isNewImage;
 
   std::shared_ptr<image_transport::ImageTransport> pTransport;
   image_transport::CameraPublisher publisher;
-  std::unique_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
+  std::shared_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
   sensor_msgs::CameraInfo camerainfo;
   sensor_msgs::Image imageMsg;
 

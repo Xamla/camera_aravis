@@ -65,7 +65,6 @@
 struct Global
 {
   std::shared_ptr<ros::NodeHandle> phNode;
-  int idSoftwareTriggerTimer;
   gboolean bCancel;
 
   std::unordered_map<std::string, GeniCam> cameras;
@@ -278,13 +277,6 @@ static void ControlLost_callback(ArvGvDevice* pGvDevice)
   global.bCancel = TRUE;
 }
 
-// static gboolean SoftwareTrigger_callback (void *pCamera)
-// {
-// 	arv_device_execute_command (global.pDevice, "TriggerSoftware");
-
-//     return TRUE;
-// }
-
 // PeriodicTask_callback()
 // Check for termination, and spin for ROS.
 static gboolean PeriodicTask_callback(void* applicationdata)
@@ -312,19 +304,15 @@ static gboolean PeriodicTask_callback(void* applicationdata)
         arv_gv_stream_get_statistics(camera.second.pStream, &n_resent, &n_missing);
         ROS_INFO("Resent buffers    = %Lu", (unsigned long long)n_resent);
         ROS_INFO("Missing           = %Lu", (unsigned long long)n_missing);
-
-
-        arv_device_execute_command(global.cameras[camera.first].pDevice,
-                                   "AcquisitionStop");
-
-        camera.second.publisher.shutdown();
-        g_object_unref(camera.second.pStream);
-        g_object_unref(camera.second.pCamera);
       }
 
       if(ros::ok())
         ros::spinOnce();
     }
+
+    global.cameras.clear();
+
+    ros::shutdown();
 
     g_main_loop_quit(pData->main_loop);
     return FALSE;
@@ -723,15 +711,9 @@ int main(int argc, char** argv)
   int i = 0;
 
   global.bCancel = FALSE;
-  global.idSoftwareTriggerTimer = 0;
 
   ros::init(argc, argv, "camera_aravis_node");
   global.phNode = std::make_shared<ros::NodeHandle>("~");
-
-  ros::AsyncSpinner spinner(1);
-  spinner.stop();
-
-  //dynamic_reconfigure::Server<Config> reconfigureServer;
 
 #if !GLIB_CHECK_VERSION(2, 35, 0)
   g_type_init();
@@ -822,9 +804,9 @@ int main(int argc, char** argv)
           print_genicam_info(camera_serial.first);
 
           std::string name = ros::this_node::getName()+"/"+camera_serial.first;
-          global.cameras[camera_serial.first].pCameraInfoManager.reset(new camera_info_manager::CameraInfoManager(
+          global.cameras[camera_serial.first].pCameraInfoManager= std::make_shared<camera_info_manager::CameraInfoManager>(
                                                                              ros::NodeHandle(name),
-                                                                             camera_serial.first));
+                                                                             camera_serial.first);
 
           ROS_INFO("Opened: %s-%s", arv_device_get_string_feature_value(
                                     global.cameras[camera_serial.first].pDevice, "DeviceVendorName"),
@@ -860,7 +842,7 @@ int main(int argc, char** argv)
         } catch (const std::exception& e)
         {
           ROS_WARN(e.what());
-          global.cameras[camera_serial.first].isReady = State::CREATED;
+          global.cameras[camera_serial.first].state = State::CREATED;
           continue;
         }
       }
@@ -868,10 +850,7 @@ int main(int argc, char** argv)
 
     //WriteCameraFeaturesFromRosparam();
 
-    // Start the camerainfo manager.
-    //std::string camera_info_url;
 
-    /*
     ros::ServiceServer captureServiceServer =
         global.phNode->advertiseService<camera_aravis::CaptureRequest,
                                         camera_aravis::CaptureResponse>
@@ -881,7 +860,7 @@ int main(int argc, char** argv)
         global.phNode->advertiseService<camera_aravis::GetConnectedDevicesRequest,
                                         camera_aravis::GetConnectedDevicesResponse>
         ("getconnecteddevices", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
-        */
+
 
     g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
@@ -892,12 +871,6 @@ int main(int argc, char** argv)
     applicationdata.main_loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(applicationdata.main_loop);
 
-    if (global.idSoftwareTriggerTimer)
-    {
-      g_source_remove(global.idSoftwareTriggerTimer);
-      global.idSoftwareTriggerTimer = 0;
-    }
-
     signal(SIGINT, pSigintHandlerOld);
 
     g_main_loop_unref(applicationdata.main_loop);
@@ -906,9 +879,6 @@ int main(int argc, char** argv)
   else
     ROS_ERROR("No cameras detected.");
 
-  global.cameras.clear();
-
-  ros::shutdown();
   while(ros::ok())
   {
     ros::spinOnce();
