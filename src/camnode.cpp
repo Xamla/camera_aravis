@@ -289,7 +289,6 @@ static gboolean PeriodicTask_callback(void* applicationdata)
     {
       if(camera.second.state == State::READY)
       {
-        std::cout<<"Test four"<<std::endl;
         guint64 n_completed_buffers;
         guint64 n_failures;
         guint64 n_underruns;
@@ -702,6 +701,30 @@ void print_genicam_info(const std::string &camera_serial)
 }
 
 
+void connectCallback(GeniCam& camera)
+{
+  if (camera.publisher.getNumSubscribers() == 1){
+    camera.state = State::STREAMING;
+    arv_device_execute_command(camera.pDevice,
+                               "AcquisitionStart");
+
+    std::string info_text = "someone subscribe to topic " + camera.publisher.getTopic() + " start continuous image aquisition";
+    ROS_INFO(info_text.c_str());
+  }
+}
+
+void disconnectCallback(GeniCam& camera)
+{
+  if (camera.publisher.getNumSubscribers() == 0){
+
+    camera.state = State::READY;
+    arv_device_execute_command(camera.pDevice,
+                               "AcquisitionStop");
+
+    std::string info_text = "number of subscribers to topic " + camera.publisher.getTopic() + " falls to 0. Continuous image aquisition stopped";
+    ROS_INFO(info_text.c_str());
+  }
+}
 
 int main(int argc, char** argv)
 {
@@ -823,7 +846,9 @@ int main(int argc, char** argv)
           // Set up image_raw.
           global.cameras[camera_serial.first].pTransport = std::make_shared<image_transport::ImageTransport>(*global.phNode);
           global.cameras[camera_serial.first].publisher = global.cameras[camera_serial.first].pTransport->advertiseCamera(
-              ros::this_node::getName() + "/" + camera_serial.first + "/image_raw", 1);
+              ros::this_node::getName() + "/" + camera_serial.first + "/image_raw", 1,
+              std::bind(&connectCallback, std::ref(global.cameras[camera_serial.first])),
+              std::bind(&disconnectCallback, std::ref(global.cameras[camera_serial.first])));
 
           // Connect signals with callbacks.
           g_signal_connect(global.cameras[camera_serial.first].pStream,
@@ -835,10 +860,8 @@ int main(int argc, char** argv)
           arv_stream_set_emit_signals(
                 (ArvStream*)global.cameras[camera_serial.first].pStream, TRUE);
 
-          arv_device_execute_command(global.cameras[camera_serial.first].pDevice,
-                                     "AcquisitionStart");
 
-          global.cameras[camera_serial.first].state = State::STREAMING;
+          global.cameras[camera_serial.first].state = State::READY;
         } catch (const std::exception& e)
         {
           ROS_WARN(e.what());

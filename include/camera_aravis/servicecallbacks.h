@@ -68,7 +68,7 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
 
         for(int i = 0; i < 3; i++)
         {
-          if(!iter->second.isNewImage)
+          if(iter->second.isNewImage == true)
           {
             break;
           }
