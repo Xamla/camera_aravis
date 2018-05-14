@@ -37,15 +37,17 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
     auto iter = cameras.find(serial);
     try
     {
-      if(!iter->second.isImplementedTriggerMode ||
-         !iter->second.isImplementedTriggerSource ||
-         !iter->second.isImplementedAcquisitionMode)
+      if(!iter->second.genicamFeatures.is_implemented("TriggerMode") ||
+         !iter->second.genicamFeatures.is_implemented("TriggerSource") ||
+         !iter->second.genicamFeatures.is_implemented("AcquisitionMode") ||
+         !iter->second.genicamFeatures.is_implemented("ExposureTime"))
       {
         std::runtime_error("Cature Service: can not be used because "
                            "software and hardware triggering is not "
                            "supported by camera with serial number: " + serial);
       }
 
+      std::chrono::nanoseconds exposure_time;
       if(iter != cameras.end())
       {
         changedTriggerProperties = true;

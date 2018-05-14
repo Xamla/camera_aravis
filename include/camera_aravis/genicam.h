@@ -1,11 +1,8 @@
 #ifndef GENICAM_H
 #define GENICAM_H
 
-#include <unordered_map>
-
 #include <ros/ros.h>
 #include <glib.h>
-#include <arv.h>
 
 #include <std_msgs/Int64.h>
 #include <image_transport/image_transport.h>
@@ -13,39 +10,14 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 
+#include "camera_aravis/genicamfeatures.h"
+
+#define ARV_PIXEL_FORMAT_BIT_PER_PIXEL(pixel_format)                           \
+  (((pixel_format) >> 16) & 0xff)
+#define ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(pixel_format)                          \
+  ((((pixel_format) >> 16) & 0xff) >> 3)
+
 enum State{CREATED,LOST_CONNECTION,READY,STREAMING};
-
-struct Config
-{
-  Config()
-  {
-    Acquire = true;
-    ExposureAuto = "Off";
-    GainAuto = "Off";
-    ExposureTimeAbs = 2000.0;
-    Gain = 1.0;
-    AcquisitionMode = "Continous";
-    AcquisitionFrameRate = 20.0;
-    TriggerMode = "Off";
-    TriggerSource = "Line1";
-    FocusPos = 32767;
-    frame_id = "camera";
-    mtu = 576;
-  }
-
-  bool Acquire;
-  std::string ExposureAuto;
-  std::string GainAuto;
-  double ExposureTimeAbs;
-  double Gain;
-  std::string AcquisitionMode;
-  double AcquisitionFrameRate;
-  std::string TriggerMode;
-  std::string TriggerSource;
-  int FocusPos;
-  std::string frame_id;
-  int mtu;
-};
 
 struct GeniCam
 {
@@ -62,8 +34,32 @@ struct GeniCam
     g_object_unref(pCamera);
   }
 
+  bool init(const std::string& serial_number)
+  {
+    name = "camera_"+serial_number;
 
-  State state;
+    xRoi = 0;
+    yRoi = 0;
+    widthRoi = 0;
+    heightRoi = 0;
+    arv_camera_get_region(pCamera,
+                          &xRoi,
+                          &yRoi,
+                          &widthRoi,
+                          &heightRoi);
+
+    pszPixelformat =
+        g_string_ascii_down(g_string_new(arv_device_get_string_feature_value(
+                                pDevice, "PixelFormat")))->str;
+    nBytesPixel = ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(
+        arv_device_get_integer_feature_value(pDevice, "PixelFormat"));
+
+    state = State::READY;
+
+    return true;
+  }
+
+  State state = State::CREATED;
   bool isNewImage;
 
   std::shared_ptr<image_transport::ImageTransport> pTransport;
@@ -77,42 +73,18 @@ struct GeniCam
   ArvDevice* pDevice;
   ArvGvStream* pStream;
 
-  gint width, height; // buffer->width and buffer->height not working, so I used
-                      // a global.
-  Config config;
-  Config configMin;
-  Config configMax;
+  // genicam feaures
+  genicam_features::GenicamFeatures genicamFeatures;
 
-  int isImplementedAcquisitionFrameRate;
-  int isImplementedAcquisitionFrameRateEnable;
-  int isImplementedGain;
-  int isImplementedExposureTimeAbs;
-  int isImplementedExposureAuto;
-  int isImplementedGainAuto;
-  int isImplementedFocusPos;
-  int isImplementedTriggerSelector;
-  int isImplementedTriggerSource;
-  int isImplementedTriggerMode;
-  int isImplementedAcquisitionMode;
-  int isImplementedMtu;
-
+  // streaming genicam features
+  std::string name;
   int xRoi;
   int yRoi;
   int widthRoi;
-  int widthRoiMin;
-  int widthRoiMax;
   int heightRoi;
-  int heightRoiMin;
-  int heightRoiMax;
-
-  int widthSensor;
-  int heightSensor;
 
   const char* pszPixelformat;
   unsigned nBytesPixel;
-  int mtu;
-  int Acquire;
-  const char* keyAcquisitionFrameRate;
 
   size_t frame_id;
   size_t nBuffers; // Counter for Hz calculation.
