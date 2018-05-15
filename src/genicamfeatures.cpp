@@ -274,35 +274,35 @@ void GenicamFeatures::add_feature_to_map(ArvGc *pGenicam, const char* name, int 
     {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
       features.emplace(name,
-        BoolFeatureProperties(name, FeatureType::BOOL));
+        std::make_shared<BoolFeatureProperties>(name, FeatureType::BOOL));
     }
     else if(ARV_IS_GC_INTEGER(node))
     {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
       features.emplace(name,
-        IntegerFeatureProperties(name, FeatureType::INTEGER));
+        std::make_shared<IntegerFeatureProperties>(name, FeatureType::INTEGER));
     }
     else if (ARV_IS_GC_FLOAT(node))
     {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
       features.emplace(name,
-        FloatFeatureProperties(name, FeatureType::FLOAT));
+        std::make_shared<FloatFeatureProperties>(name, FeatureType::FLOAT));
     }
     else if(ARV_IS_GC_STRING(node))
     {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
       features.emplace(name,
-        StringFeatureProperties(name, FeatureType::STRING));
+        std::make_shared<StringFeatureProperties>(name, FeatureType::STRING));
     }
     else if (ARV_IS_GC_ENUMERATION(node)) {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
       features.emplace(name,
-        EnumerationFeatureProperties(name, FeatureType::ENUMARATION));
+        std::make_shared<EnumerationFeatureProperties>(name, FeatureType::ENUMARATION));
     }
   }
 }
 
-FeatureProperties &GenicamFeatures::get_feature(const std::string& feature_name)
+std::shared_ptr<FeatureProperties> GenicamFeatures::get_feature(const std::string& feature_name)
 {
   return features[feature_name];
 }

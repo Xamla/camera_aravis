@@ -139,7 +139,6 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
   for(auto &serial : request.serials )
   {
     bool wasStreaming = false;
-    bool changedTriggerProperties = false;
     auto iter = cameras.find(serial);
     try
     {
@@ -152,7 +151,6 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
 
       if(iter != cameras.end())
       {
-        changedTriggerProperties = true;
         if(iter->second.state == State::STREAMING)
         {
           wasStreaming = true;
@@ -161,7 +159,7 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
         }
 
         std::string value = std::to_string(request.value);
-        iter->second.genicamFeatures.get_feature(request.command_name).set_current_value(
+        iter->second.genicamFeatures.get_feature(request.command_name)->set_current_value(
               iter->second.pDevice, value);
 
         if(wasStreaming == true)

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 #include <ros/ros.h>
 #include <arv.h>
@@ -36,15 +37,14 @@ public:
 
   bool is_implemented(const std::string& feature_name);
 
-  FeatureProperties& get_feature(const std::string& feature_name);
+  std::shared_ptr<FeatureProperties> get_feature(const std::string& feature_name);
 protected:
   // methods
   void add_feature_to_map(ArvGc *pGenicam, const char* name, int level);
 
   // attributes
   bool isInitialized;
-
-  std::unordered_map<std::string, FeatureProperties> features;
+  std::unordered_map<std::string, std::shared_ptr<FeatureProperties>> features;
 };
 
 }

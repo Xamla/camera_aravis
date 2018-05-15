@@ -600,6 +600,11 @@ int main(int argc, char** argv)
                                         camera_aravis::GetConnectedDevicesResponse>
         ("getconnecteddevices", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
 
+    ros::ServiceServer sendCommandServiceServer =
+        global.phNode->advertiseService<camera_aravis::SendCommandRequest,
+                                        camera_aravis::SendCommandResponse>
+        ("sendcommand", std::bind(&sendCommand_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
+
 
     g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
