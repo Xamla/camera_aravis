@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <vector>
+#include <string>
 
 #include <camera_aravis/Capture.h>
 #include <camera_aravis/GetConnectedDevices.h>
@@ -47,7 +48,6 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
                            "supported by camera with serial number: " + serial);
       }
 
-      std::chrono::nanoseconds exposure_time;
       if(iter != cameras.end())
       {
         changedTriggerProperties = true;
@@ -61,6 +61,7 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
         arv_device_set_string_feature_value (iter->second.pDevice, "AcquisitionMode", "SingleFrame");
         arv_device_set_string_feature_value (iter->second.pDevice, "TriggerMode", "On");
         arv_device_set_string_feature_value (iter->second.pDevice, "TriggerSource", "Software");
+        std::chrono::microseconds exposure_time(int(arv_device_get_float_feature_value(iter->second.pDevice, "ExposureTime")));
 
         arv_device_execute_command(iter->second.pDevice,
                                  "AcquisitionStart");
@@ -128,6 +129,68 @@ bool getConnectedDevices_callback(camera_aravis::GetConnectedDevicesRequest& req
       response.serials.push_back(camera.first);
     }
   }
+  return true;
+}
+
+bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
+                     camera_aravis::SendCommandResponse& response,
+                     std::unordered_map<std::string, GeniCam>& cameras)
+{
+  for(auto &serial : request.serials )
+  {
+    bool wasStreaming = false;
+    bool changedTriggerProperties = false;
+    auto iter = cameras.find(serial);
+    try
+    {
+      if(!iter->second.genicamFeatures.is_implemented(request.command_name))
+      {
+        std::runtime_error("sendCommand Service: can set value for command" +
+                           request.command_name + " ,because it is not " +
+                           "supported by camera with serial number: " + serial);
+      }
+
+      if(iter != cameras.end())
+      {
+        changedTriggerProperties = true;
+        if(iter->second.state == State::STREAMING)
+        {
+          wasStreaming = true;
+          arv_device_execute_command(iter->second.pDevice,
+                                   "AcquisitionStop");
+        }
+
+        std::string value = std::to_string(request.value);
+        iter->second.genicamFeatures.get_feature(request.command_name).set_current_value(
+              iter->second.pDevice, value);
+
+        if(wasStreaming == true)
+        {
+          arv_device_execute_command(iter->second.pDevice,
+                                   "AcquisitionStart");
+        }
+      }
+      else
+      {
+        std::runtime_error("Cature Service: request image from "
+                           "not available camera with serial: " + serial);
+      }
+
+    }
+    catch(const std::exception &e)
+    {
+      if(wasStreaming == true)
+      {
+        arv_device_execute_command(iter->second.pDevice,
+                                 "AcquisitionStart");
+      }
+      response.response = "only the command for cameras before the camera with serial "
+                          "number " + serial + " could be executed";
+      ROS_WARN(e.what());
+      return false;
+    }
+  }
+  response.response="everthing works fine";
   return true;
 }
 

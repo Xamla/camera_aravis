@@ -576,6 +576,8 @@ int main(int argc, char** argv)
           arv_stream_set_emit_signals(
                 (ArvStream*)global.cameras[camera_serial.first].pStream, TRUE);
 
+
+          global.cameras[camera_serial.first].state = State::READY;
         } catch (const std::exception& e)
         {
           ROS_WARN(e.what());

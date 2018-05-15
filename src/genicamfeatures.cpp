@@ -1,10 +1,204 @@
 #include "camera_aravis/genicamfeatures.h"
+#include <cctype>
 
 namespace genicam_features {
+
+// bool feature class
+class BoolFeatureProperties : public FeatureProperties
+{
+public:
+  BoolFeatureProperties(const std::string& feature_name, const FeatureType& feature_type) :
+    FeatureProperties(feature_name, feature_type){}
+
+  std::string get_current_value(ArvDevice* pDevice) override
+  {
+    return std::to_string(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
+  }
+
+  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  {
+    try
+    {
+      if(iequals(value, "true") || std::stoi(value) > 1)
+      {
+        arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), 1);
+      }
+      else if(iequals(value, "false") || std::stoi(value) < 1)
+      {
+        arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), 0);
+      }
+      else
+        throw std::runtime_error("value could not be converted to bool");
+    } catch (const std::exception& e)
+    {
+      ROS_WARN(("Could not set value for feature " + feature_name + " because of following exception: " + e.what()).c_str());
+    }
+  }
+
+protected:
+
+  bool iequals(const std::string & value1, const std::string &value2)
+  {
+    std::string str1 = value1;
+    std::string str2 = value2;
+    return ((str1.size() == str2.size()) && std::equal(str1.begin(), str1.end(), str2.begin(), [](char & c1, char & c2){
+                return (c1 == c2 || std::toupper(c1) == std::toupper(c2));
+                  }));
+  }
+
+};
+
+class IntegerFeatureProperties : public FeatureProperties
+{
+public:
+  IntegerFeatureProperties(const std::string& feature_name, const FeatureType& feature_type):
+    FeatureProperties(feature_name, feature_type){}
+
+  std::string get_current_value(ArvDevice* pDevice)
+  {
+    return std::to_string(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
+  }
+
+  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  {
+    gint64 valueI;
+    gint64 min, max;
+
+    try
+    {
+      valueI = std::stoi(value);
+    } catch(const std::exception &e)
+    {
+      ROS_WARN(("Warning: Try to set feature" + feature_name +
+                " but it was not possible to convert " + value +
+                " to int. Do nothing").c_str());
+    }
+
+    arv_device_get_integer_feature_bounds(pDevice, feature_name.c_str(), &min, &max);
+
+    if(valueI > max)
+    {
+      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+               + "to " + std::to_string(valueI) + "but max value is " +
+               std::to_string(max) + ". Therefore it is set to max value").c_str());
+      arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), max);
+    }
+    else if(valueI < min)
+    {
+      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+               + "to " + std::to_string(valueI) + "but min value is "
+               + std::to_string(max) + ". Therefore it is set to min value").c_str());
+      arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), min);
+    }
+    else
+      arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), valueI);
+  }
+};
+
+class FloatFeatureProperties : public FeatureProperties
+{
+public:
+  FloatFeatureProperties(const std::string& feature_name, const FeatureType& feature_type):
+    FeatureProperties(feature_name, feature_type){}
+
+  std::string get_current_value(ArvDevice* pDevice)
+  {
+    return std::to_string(arv_device_get_float_feature_value(pDevice, feature_name.c_str()));
+  }
+
+  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  {
+    double valueD;
+    double min, max;
+
+    try
+    {
+      valueD = std::stod(value);
+    } catch(const std::exception &e)
+    {
+      ROS_WARN(("Warning: Try to set feature" + feature_name +
+                " but it was not possible to convert " + value +
+                " to double. Do nothing").c_str());
+    }
+
+    arv_device_get_float_feature_bounds(pDevice, feature_name.c_str(), &min, &max);
+
+    if(valueD > max)
+    {
+      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+               + "to " + std::to_string(valueD) + "but max value is " +
+               std::to_string(max) + ". Therefore it is set to max value").c_str());
+      arv_device_set_float_feature_value(pDevice, feature_name.c_str(), max);
+    }
+    else if(valueD < min)
+    {
+      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+               + "to " + std::to_string(valueD) + "but min value is " +
+               std::to_string(max) + ". Therefore it is set to min value").c_str());
+      arv_device_set_float_feature_value(pDevice, feature_name.c_str(), min);
+    }
+    else
+      arv_device_set_float_feature_value(pDevice, feature_name.c_str(), valueD);
+  }
+};
+
+class StringFeatureProperties : public FeatureProperties
+{
+public:
+  StringFeatureProperties(const std::string& feature_name, const FeatureType& feature_type):
+    FeatureProperties(feature_name, feature_type){}
+
+  std::string get_current_value(ArvDevice* pDevice)
+  {
+    return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
+  }
+
+  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  {
+    arv_device_set_string_feature_value(pDevice, feature_name.c_str(), value.c_str());
+  }
+};
+
+class EnumerationFeatureProperties : public FeatureProperties
+{
+public:
+  EnumerationFeatureProperties(const std::string& feature_name, const FeatureType& feature_type):
+    FeatureProperties(feature_name, feature_type){}
+  std::string get_current_value(ArvDevice* pDevice)
+  {
+    return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
+  }
+
+  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  {
+    guint i;
+    guint size = 0;
+    const char** enum_list = arv_device_get_available_enumeration_feature_values_as_strings(pDevice, feature_name.c_str(), &size);
+    for(i=0; i<size; i++)
+    {
+      if(value.compare(std::string(enum_list[i]))==0)
+      {
+        break;
+      }
+    }
+
+    if (i<size)
+    {
+      arv_device_set_string_feature_value(pDevice, feature_name.c_str(),value.c_str());
+    }
+    else
+    {
+      ROS_WARN(("Enum Warning: Try to set enum feature "+ feature_name
+               + " to " + value + " but this is not available. Do nothing").c_str());
+    }
+  }
+};
+
 
 // methods of class FeatureProperites
 FeatureProperties::FeatureProperties(const std::string &feature_name, const FeatureType &feature_type)
 {
+  this->feature_name = feature_name;
   this->feature_type = feature_type;
 }
 
@@ -13,95 +207,17 @@ FeatureType FeatureProperties::get_feature_type()
   return feature_type;
 }
 
-//methods of class BoolFeatureProperties
-
-BoolFeatureProperties::BoolFeatureProperties(const std::string &feature_name, const FeatureType &feature_type) :
-  FeatureProperties(feature_name, feature_type)
+std::string FeatureProperties::get_current_value(ArvDevice* pDevice)
 {
-
+  ROS_WARN("use get_current_value function of base class FeatureProperties");
+  return "";
 }
 
-bool BoolFeatureProperties::get_current_value(ArvDevice *pDevice)
+void FeatureProperties::set_current_value(ArvDevice* pDevice, const std::string& value)
 {
-  return bool(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
+  ROS_WARN("use set_current_value function of base class FeatureProperties");
 }
 
-//methods of class IntegerFeatureProperties
-
-IntegerFeatureProperties::IntegerFeatureProperties(const std::string &feature_name, const FeatureType &feature_type) :
-  FeatureProperties(feature_name, feature_type)
-{
-
-}
-
-int IntegerFeatureProperties::get_current_value(ArvDevice *pDevice)
-{
-  return int(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
-}
-
-void IntegerFeatureProperties::get_value_bounds(ArvDevice *pDevice, int &min, int &max)
-{
-  gint64 gmin, gmax;
-  arv_device_get_integer_feature_bounds(pDevice, feature_name.c_str(), &gmin, &gmax);
-  min = int(gmin);
-  max = int(gmax);
-}
-
-//methods of class FloatFeatureProperties
-FloatFeatureProperties::FloatFeatureProperties(const std::string &feature_name, const FeatureType &feature_type) :
-  FeatureProperties(feature_name, feature_type)
-{
-
-}
-
-double FloatFeatureProperties::get_current_value(ArvDevice *pDevice)
-{
-  return double(arv_device_get_float_feature_value(pDevice, feature_name.c_str()));
-}
-
-void FloatFeatureProperties::get_value_bounds(ArvDevice *pDevice, double &min, double &max)
-{
-  arv_device_get_float_feature_bounds(pDevice, feature_name.c_str(), &min, &max);
-}
-
-//methods of class StringFeatureProperties
-StringFeatureProperties::StringFeatureProperties(const std::string &feature_name, const FeatureType &feature_type) :
-  FeatureProperties(feature_name, feature_type)
-{
-
-}
-
-std::string StringFeatureProperties::get_current_value(ArvDevice *pDevice)
-{
-  return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
-}
-
-//methods of class EnumerationFeatureProperties
-EnumerationFeatureProperties::EnumerationFeatureProperties(const std::string &feature_name, const FeatureType &feature_type) :
-  FeatureProperties(feature_name, feature_type)
-{
-
-}
-
-std::string EnumerationFeatureProperties::get_current_value(ArvDevice *pDevice)
-{
-  return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
-}
-
-bool EnumerationFeatureProperties::check_if_value_exists(ArvDevice* pDevice, const std::string& value)
-{
-  guint size = 0;
-  const char** enum_list = arv_device_get_available_enumeration_feature_values_as_strings(pDevice, feature_name.c_str(), &size);
-  for(guint i=0; i<size; i++)
-  {
-    if(value.compare(std::string(enum_list[i]))==0)
-    {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 // methods of class GenicamFeatures
 
@@ -154,6 +270,12 @@ void GenicamFeatures::add_feature_to_map(ArvGc *pGenicam, const char* name, int 
         add_feature_to_map(pGenicam, (char*) iter->data, level + 1);
 
     }
+    else if(ARV_IS_GC_BOOLEAN_CLASS(node))
+    {
+      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+      features.emplace(name,
+        BoolFeatureProperties(name, FeatureType::BOOL));
+    }
     else if(ARV_IS_GC_INTEGER(node))
     {
       std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
@@ -180,4 +302,10 @@ void GenicamFeatures::add_feature_to_map(ArvGc *pGenicam, const char* name, int 
   }
 }
 
+FeatureProperties &GenicamFeatures::get_feature(const std::string& feature_name)
+{
+  return features[feature_name];
 }
+
+}
+

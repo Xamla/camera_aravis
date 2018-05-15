@@ -1,7 +1,6 @@
 #ifndef GENICAM_H
 #define GENICAM_H
 
-#include <ros/ros.h>
 #include <glib.h>
 
 #include <std_msgs/Int64.h>
