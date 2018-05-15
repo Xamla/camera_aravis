@@ -483,6 +483,9 @@ int main(int argc, char** argv)
             throw std::runtime_error("parameter for camera with ID: " + camera_serial.first +" could not be initialized. skip");
           }
 
+          arv_device_execute_command(global.cameras[camera_serial.first].pDevice,
+                                     "AcquisitionStop");
+
           arv_stream_set_emit_signals(
                 (ArvStream*)global.cameras[camera_serial.first].pStream, TRUE);
 
