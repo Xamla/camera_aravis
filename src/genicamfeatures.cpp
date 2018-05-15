@@ -1,4 +1,5 @@
 #include "camera_aravis/genicamfeatures.h"
+#include "XmlRpc.h"
 #include <cctype>
 
 namespace genicam_features {
@@ -227,7 +228,7 @@ GenicamFeatures::GenicamFeatures()
   isInitialized = false;
 }
 
-bool GenicamFeatures::init(ArvDevice *pDevice)
+bool GenicamFeatures::init(std::shared_ptr<ros::NodeHandle> &phNode, ArvDevice *pDevice, std::string serial_number)
 {
   ArvGc	*pGenicam=NULL;
   pGenicam = arv_device_get_genicam(pDevice);
@@ -238,6 +239,7 @@ bool GenicamFeatures::init(ArvDevice *pDevice)
 
   add_feature_to_map(pGenicam, "Root", 0);
   isInitialized = true;
+  write_features_from_rosparam(phNode, pDevice, serial_number);
   return true;
 }
 
@@ -307,5 +309,39 @@ std::shared_ptr<FeatureProperties> GenicamFeatures::get_feature(const std::strin
   return features[feature_name];
 }
 
+
+
+void GenicamFeatures::write_features_from_rosparam(std::shared_ptr<ros::NodeHandle> &phNode, ArvDevice *pDevice, std::string serial_number)
+{
+  XmlRpc::XmlRpcValue xmlrpcParams;
+
+  phNode->getParam(ros::this_node::getName()+"/"+ serial_number + "/feature", xmlrpcParams);
+
+  if (xmlrpcParams.getType() == XmlRpc::XmlRpcValue::TypeStruct)
+  {
+    for (auto xmlrpcParam : xmlrpcParams)
+    {
+      if(is_implemented(xmlrpcParam.first))
+      {
+        if(xmlrpcParam.second.getType() == XmlRpc::XmlRpcValue::TypeString)
+        {
+          features[xmlrpcParam.first]->set_current_value(pDevice, xmlrpcParam.second);
+        }
+        else
+        {
+          ROS_WARN(("write_features_from_rosparam: try to set feature " + xmlrpcParam.first +
+                    " for camera " + serial_number + " but value has to be string (conversion is internally handled)").c_str());
+        }
+      }
+      else
+      {
+        ROS_WARN(("write_features_from_rosparam: can set value for command" +
+                 xmlrpcParam.first + " ,because it is not " +
+                 "supported by camera with serial number: " + serial_number).c_str());
+      }
+    }
+  }
 }
+
+} //end of namespace
 

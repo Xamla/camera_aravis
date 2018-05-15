@@ -42,7 +42,6 @@
 
 #include "camera_aravis/servicecallbacks.h"
 #include "camera_aravis/genicam.h"
-#include "XmlRpc.h"
 
 //#define TUNING	// Allows tuning the gains for the timestamp controller.
 //Publishes output on topic /dt, and receives gains on params /kp, /ki, /kd
@@ -322,95 +321,6 @@ static gboolean PeriodicTask_callback(void* applicationdata)
 // camera bools are false/true parameters (not 0/1),
 // integers are integers, doubles are doubles, etc.
 //
-/*void WriteCameraFeaturesFromRosparam(void)
-{
-  XmlRpc::XmlRpcValue xmlrpcParams;
-  XmlRpc::XmlRpcValue::iterator iter;
-  ArvGcNode* pGcNode;
-  GError* error = NULL;
-
-  global.phNode->getParam(ros::this_node::getName(), xmlrpcParams);
-
-  if (xmlrpcParams.getType() == XmlRpc::XmlRpcValue::TypeStruct)
-  {
-    for (iter = xmlrpcParams.begin(); iter != xmlrpcParams.end(); iter++)
-    {
-      std::string key = iter->first;
-      pGcNode = arv_device_get_feature(global.pDevice, key.c_str());
-      if (pGcNode && arv_gc_feature_node_is_implemented(
-                         ARV_GC_FEATURE_NODE(pGcNode), &error))
-      {
-        //				unsigned long	typeValue =
-        //arv_gc_feature_node_get_value_type((ArvGcFeatureNode *)pGcNode);
-        //				ROS_INFO("%s cameratype=%lu, rosparamtype=%d",
-        //key.c_str(), typeValue, static_cast<int>(iter->second.getType()));
-
-        // We'd like to check the value types too, but typeValue is often given
-        // as G_TYPE_INVALID, so ignore it.
-        switch (iter->second.getType())
-        {
-        case XmlRpc::XmlRpcValue::
-            TypeBoolean: // if
-                         // ((iter->second.getType()==XmlRpc::XmlRpcValue::TypeBoolean))//
-                         // && (typeValue==G_TYPE_INT64))
-        {
-          int value = (bool)iter->second;
-          arv_device_set_integer_feature_value(global.pDevice, key.c_str(),
-                                               value);
-          ROS_INFO("Read parameter (bool) %s: %d", key.c_str(), value);
-        }
-        break;
-
-        case XmlRpc::XmlRpcValue::
-            TypeInt: // if
-                     // ((iter->second.getType()==XmlRpc::XmlRpcValue::TypeInt))//
-                     // && (typeValue==G_TYPE_INT64))
-        {
-          int value = (int)iter->second;
-          arv_device_set_integer_feature_value(global.pDevice, key.c_str(),
-                                               value);
-          ROS_INFO("Read parameter (int) %s: %d", key.c_str(), value);
-        }
-        break;
-
-        case XmlRpc::XmlRpcValue::
-            TypeDouble: // if
-                        // ((iter->second.getType()==XmlRpc::XmlRpcValue::TypeDouble))//
-                        // && (typeValue==G_TYPE_DOUBLE))
-        {
-          double value = (double)iter->second;
-          arv_device_set_float_feature_value(global.pDevice, key.c_str(),
-                                             value);
-          ROS_INFO("Read parameter (float) %s: %f", key.c_str(), value);
-        }
-        break;
-
-        case XmlRpc::XmlRpcValue::
-            TypeString: // if
-                        // ((iter->second.getType()==XmlRpc::XmlRpcValue::TypeString))//
-                        // && (typeValue==G_TYPE_STRING))
-        {
-          std::string value = (std::string)iter->second;
-          arv_device_set_string_feature_value(global.pDevice, key.c_str(),
-                                              value.c_str());
-          ROS_INFO("Read parameter (string) %s: %s", key.c_str(),
-                   value.c_str());
-        }
-        break;
-
-        case XmlRpc::XmlRpcValue::TypeInvalid:
-        case XmlRpc::XmlRpcValue::TypeDateTime:
-        case XmlRpc::XmlRpcValue::TypeBase64:
-        case XmlRpc::XmlRpcValue::TypeArray:
-        case XmlRpc::XmlRpcValue::TypeStruct:
-        default:
-          ROS_WARN(
-              "Unhandled rosparam type in WriteCameraFeaturesFromRosparam()");
-        }
-      }
-    }
-  }
-} // WriteCameraFeaturesFromRosparam()*/
 
 void connectCallback(GeniCam& camera)
 {
@@ -567,7 +477,7 @@ int main(int argc, char** argv)
                            G_CALLBACK(ControlLost_callback), NULL);
 
           if (!global.cameras[camera_serial.first].genicamFeatures.init(
-                global.cameras[camera_serial.first].pDevice)||
+                global.phNode, global.cameras[camera_serial.first].pDevice, camera_serial.first)||
               !global.cameras[camera_serial.first].init(camera_serial.first))
           {
             throw std::runtime_error("parameter for camera with ID: " + camera_serial.first +" could not be initialized. skip");

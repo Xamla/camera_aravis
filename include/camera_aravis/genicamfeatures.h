@@ -33,11 +33,14 @@ class GenicamFeatures
 public:
   GenicamFeatures();
 
-  bool init(ArvDevice *pDevice);
+  bool init(std::shared_ptr<ros::NodeHandle>& phNode, ArvDevice *pDevice, std::string serial_number);
 
   bool is_implemented(const std::string& feature_name);
 
   std::shared_ptr<FeatureProperties> get_feature(const std::string& feature_name);
+
+  void write_features_from_rosparam(std::shared_ptr<ros::NodeHandle>& phNode, ArvDevice *pDevice, std::string serial_number);
+
 protected:
   // methods
   void add_feature_to_map(ArvGc *pGenicam, const char* name, int level);

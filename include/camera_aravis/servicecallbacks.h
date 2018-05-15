@@ -48,7 +48,9 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
                            "supported by camera with serial number: " + serial);
       }
 
-      if(iter != cameras.end())
+      if(iter != cameras.end() &&
+         (iter->second.state == State::READY ||
+          iter->second.state == State::STREAMING))
       {
         changedTriggerProperties = true;
         if(iter->second.state == State::STREAMING)
@@ -94,8 +96,8 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
       }
       else
       {
-        std::runtime_error("Cature Service: request image from "
-                           "not available camera with serial: " + serial);
+        std::runtime_error("Cature Service: camera with serial "
+                           + serial + "is not available");
       }
 
     } catch(const std::exception& e)
@@ -149,7 +151,9 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
                            "supported by camera with serial number: " + serial);
       }
 
-      if(iter != cameras.end())
+      if(iter != cameras.end() &&
+         (iter->second.state == State::READY ||
+          iter->second.state == State::STREAMING))
       {
         if(iter->second.state == State::STREAMING)
         {
@@ -170,8 +174,8 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
       }
       else
       {
-        std::runtime_error("Cature Service: request image from "
-                           "not available camera with serial: " + serial);
+        std::runtime_error("sendCommand Service: camera with serial "
+                           + serial + "is not available");
       }
 
     }
