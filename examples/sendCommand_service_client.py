@@ -32,7 +32,7 @@ def main():
 
   serials = call_getconnecteddevices_service()
 
-  call_sendcommand_service("ExposureTime", 3000.0, serials)
+  call_sendcommand_service("ExposureTime", 15000.0, serials)
 
 if __name__ == "__main__":
   main()

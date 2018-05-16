@@ -10,14 +10,11 @@ import pdb
 import json
 import datetime
 import cv2
-import pdb
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from camera_aravis.srv import *
-import Tkinter as tk
+#import Tkinter as tk
 
 class FileManager:
   def __init__(self, path):
@@ -90,21 +87,26 @@ class SaveImageAndJointState:
 
 if __name__ == "__main__":
   path = '/home/volk/Desktop/recording'
-  serials = ['4103235743']
+  #serials = ['4103217455']
+  serials = ['4103235743','4103217455']
 
   saveIAJ = SaveImageAndJointState(path, serials)
 
-  def callback(event):
-    print('start capture process') 
-    saveIAJ.capture()
-    print('ready for next')
+  print('start capture process') 
+  saveIAJ.capture()
+  print('ready for next')
 
-  root = tk.Tk()
-  canvas= tk.Canvas(root, width=100, height=100)
-  canvas.create_text(50,50,fill="black",font="Times 10 italic bold",
-                        text="Click to capture")
-  canvas.bind("<Button-1>", callback)
-  canvas.pack()
-  root.mainloop()
+  #def callback(event):
+  #  print('start capture process') 
+  #  saveIAJ.capture()
+  #  print('ready for next')
+
+  #root = tk.Tk()
+  #canvas= tk.Canvas(root, width=100, height=100)
+  #canvas.create_text(50,50,fill="black",font="Times 10 italic bold",
+  #                      text="Click to capture")
+  #canvas.bind("<Button-1>", callback)
+  #canvas.pack()
+  #root.mainloop()
 
 
