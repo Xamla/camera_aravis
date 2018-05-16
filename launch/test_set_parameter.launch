@@ -1,5 +1,6 @@
 <launch> 
   <node name="aravis_camera_node" pkg="camera_aravis" type="camera_aravis_node" output="screen" respawn="true">
+    <rosparam param="camera_serials">['4103235743']</rosparam>
     <rosparam ns="4103217455/feature">
       ExposureTime: '30000'
     </rosparam>

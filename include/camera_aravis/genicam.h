@@ -25,12 +25,16 @@ struct GeniCam
 
   ~GeniCam()
   {
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
+    if(state == State::READY ||
+       state == State::STREAMING)
+    {
+      arv_device_execute_command(pDevice,
+                                 "AcquisitionStop");
 
-    publisher.shutdown();
-    g_object_unref(pStream);
-    g_object_unref(pCamera);
+      publisher.shutdown();
+      g_object_unref(pStream);
+      g_object_unref(pCamera);
+    }
   }
 
   bool init(const std::string& serial_number)

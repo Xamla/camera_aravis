@@ -256,9 +256,12 @@ static void NewBuffer_callback(ArvStream* pStream,
   }
 } // NewBuffer_callback()
 
-static void ControlLost_callback(ArvGvDevice* pGvDevice)
+static void ControlLost_callback(ArvGvDevice* pGvDevice,
+                                 GeniCam* pCameradata)
 {
   ROS_ERROR("Control lost.");
+
+  *pCameradata = GeniCam();
 
   global.bCancel = TRUE;
 }
@@ -308,19 +311,6 @@ static gboolean PeriodicTask_callback(void* applicationdata)
   return TRUE;
 } // PeriodicTask_callback()
 
-// WriteCameraFeaturesFromRosparam()
-// Read ROS parameters from this node's namespace, and see if each parameter has
-// a similarly named & typed feature in the camera.  Then set the
-// camera feature to that value.  For example, if the parameter camnode/Gain is
-// set to 123.0, then we'll write 123.0 to the Gain feature
-// in the camera.
-//
-// Note that the datatype of the parameter *must* match the datatype of the
-// camera feature, and this can be determined by
-// looking at the camera's XML file.  Camera enum's are string parameters,
-// camera bools are false/true parameters (not 0/1),
-// integers are integers, doubles are doubles, etc.
-//
 
 void connectCallback(GeniCam& camera)
 {
@@ -474,7 +464,8 @@ int main(int argc, char** argv)
                            "new-buffer", G_CALLBACK(NewBuffer_callback),
                            &global.cameras[camera_serial.first]);
           g_signal_connect(global.cameras[camera_serial.first].pDevice, "control-lost",
-                           G_CALLBACK(ControlLost_callback), NULL);
+                           G_CALLBACK(ControlLost_callback),
+                           &global.cameras[camera_serial.first]);
 
           if (!global.cameras[camera_serial.first].genicamFeatures.init(
                 global.phNode, global.cameras[camera_serial.first].pDevice, camera_serial.first)||
