@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 
 # Enable C++11
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra")
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 project(camera_aravis)
@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModu
 find_package(catkin REQUIRED COMPONENTS
              roscpp sensor_msgs std_msgs
              image_transport camera_info_manager
-             genmsg cv_bridge)
+             message_generation cv_bridge)
 
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
@@ -33,7 +33,7 @@ generate_messages(
 
 catkin_package(
     DEPENDS Aravis GLIB2
-    CATKIN_DEPENDS roscpp std_msgs sensor_msgs image_transport camera_info_manager cv_bridge
+    CATKIN_DEPENDS roscpp message_runtime std_msgs sensor_msgs image_transport camera_info_manager cv_bridge
     INCLUDE_DIRS include
     LIBRARIES
 )
