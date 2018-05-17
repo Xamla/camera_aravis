@@ -257,6 +257,7 @@ bool GenicamFeatures::is_implemented(const std::string &feature_name)
 void GenicamFeatures::add_feature_to_map(ArvGc *pGenicam, const char* name, int level)
 {
   ArvGcNode *node;
+  GType value_type;
 
   node = arv_gc_get_node(pGenicam, name);
   if (ARV_IS_GC_FEATURE_NODE(node) &&
@@ -272,34 +273,40 @@ void GenicamFeatures::add_feature_to_map(ArvGc *pGenicam, const char* name, int 
         add_feature_to_map(pGenicam, (char*) iter->data, level + 1);
 
     }
-    else if(ARV_IS_GC_BOOLEAN_CLASS(node))
+    else
     {
-      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
-      features.emplace(name,
-        std::make_shared<BoolFeatureProperties>(name, FeatureType::BOOL));
-    }
-    else if(ARV_IS_GC_INTEGER(node))
-    {
-      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
-      features.emplace(name,
-        std::make_shared<IntegerFeatureProperties>(name, FeatureType::INTEGER));
-    }
-    else if (ARV_IS_GC_FLOAT(node))
-    {
-      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
-      features.emplace(name,
-        std::make_shared<FloatFeatureProperties>(name, FeatureType::FLOAT));
-    }
-    else if(ARV_IS_GC_STRING(node))
-    {
-      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
-      features.emplace(name,
-        std::make_shared<StringFeatureProperties>(name, FeatureType::STRING));
-    }
-    else if (ARV_IS_GC_ENUMERATION(node)) {
-      std::string name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
-      features.emplace(name,
-        std::make_shared<EnumerationFeatureProperties>(name, FeatureType::ENUMARATION));
+      std::string name;
+      value_type = arv_gc_feature_node_get_value_type (ARV_GC_FEATURE_NODE(node));
+
+      switch(value_type){
+      case G_TYPE_BOOLEAN:
+        name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+        features.emplace(name, std::make_shared<BoolFeatureProperties>(name, FeatureType::BOOL));
+        break;
+
+      case G_TYPE_INT64:
+        if (ARV_IS_GC_ENUMERATION(node))
+        {
+          name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+          features.emplace(name, std::make_shared<EnumerationFeatureProperties>(name, FeatureType::ENUMARATION));
+        }
+        else
+        {
+          name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+          features.emplace(name, std::make_shared<IntegerFeatureProperties>(name, FeatureType::INTEGER));
+          break;
+        }
+
+      case G_TYPE_DOUBLE:
+        name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+        features.emplace(name, std::make_shared<FloatFeatureProperties>(name, FeatureType::FLOAT));
+        break;
+
+      case G_TYPE_STRING:
+        name = arv_gc_feature_node_get_name(ARV_GC_FEATURE_NODE(node));
+        features.emplace(name, std::make_shared<StringFeatureProperties>(name, FeatureType::STRING));
+        break;
+      }
     }
   }
 }
@@ -319,12 +326,16 @@ void GenicamFeatures::write_features_from_rosparam(std::shared_ptr<ros::NodeHand
 
   if (xmlrpcParams.getType() == XmlRpc::XmlRpcValue::TypeStruct)
   {
+    ROS_ERROR("size of parameter %d", xmlrpcParams.size());
     for (auto xmlrpcParam : xmlrpcParams)
     {
+      ROS_ERROR("parameter feature %s", xmlrpcParam.first.c_str());
       if(is_implemented(xmlrpcParam.first))
       {
+        ROS_ERROR("parameter feature %d", xmlrpcParam.second.getType());
         if(xmlrpcParam.second.getType() == XmlRpc::XmlRpcValue::TypeString)
         {
+          ROS_ERROR("internal type %d", features[xmlrpcParam.first]->get_feature_type());
           features[xmlrpcParam.first]->set_current_value(pDevice, xmlrpcParam.second);
         }
         else

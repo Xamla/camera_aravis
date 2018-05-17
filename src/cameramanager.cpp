@@ -1,10 +1,9 @@
 #include "camera_aravis/cameramanager.h"
 
-CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle)
+CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
+  phNodeHandle(nodeHandle)
 {
-  this->phNodeHandle = nodeHandle;
-
-  initializeDevices();
+  initializeDevices(true);
 }
 
 gboolean CameraManager::update_callback(void *cameraManager)
@@ -15,9 +14,9 @@ gboolean CameraManager::update_callback(void *cameraManager)
 }
 
 
-void CameraManager::initializeDevices()
+void CameraManager::initializeDevices(bool is_first_time)
 {
-  std::vector<std::string> requested_cameras;
+  uint64_t nDevices=0;
   std::unordered_map<std::string, std::string> available_cameras;
 
   // Print out some useful info.
@@ -26,7 +25,7 @@ void CameraManager::initializeDevices()
 
   nDevices = arv_get_n_devices();
   ROS_INFO("# Number of found Devices: %d", nDevices);
-  for (i = 0; i < nDevices; i++)
+  for (int i = 0; i < nDevices; i++)
   {
     std::string device_ID = arv_get_device_id(i);
     ROS_INFO("Device%d: %s", i, device_ID.c_str());
@@ -41,17 +40,20 @@ void CameraManager::initializeDevices()
 
   }
 
-  if (global.phNode->hasParam(ros::this_node::getName() + "/camera_serials"))
+  if(is_first_time == true)
   {
-    global.phNode->getParam(ros::this_node::getName() + "/camera_serials",
-                            requested_cameras);
-  }
-
-  if (requested_cameras_serial.size()==0)
-  {
-    for(auto &camera : available_cameras)
+    if (phNodeHandle->hasParam(ros::this_node::getName() + "/camera_serials"))
     {
-      requested_cameras.push_back(camera.first);
+      phNodeHandle->getParam(ros::this_node::getName() + "/camera_serials",
+                              requested_cameras);
+    }
+
+    if (requested_cameras.size()==0)
+    {
+      for(auto &camera : available_cameras)
+      {
+        requested_cameras.push_back(camera.first);
+      }
     }
   }
 

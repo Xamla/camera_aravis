@@ -41,7 +41,7 @@
 #include <sensor_msgs/image_encodings.h>
 
 #include "camera_aravis/servicecallbacks.h"
-#include "camera_aravis/genicam.h"
+#include "camera_aravis/cameramanager.h"
 
 //#define TUNING	// Allows tuning the gains for the timestamp controller.
 //Publishes output on topic /dt, and receives gains on params /kp, /ki, /kd
@@ -381,6 +381,8 @@ int main(int argc, char** argv)
 
   }
 
+  CameraManager cameraManager(global.phNode);
+
   if (nDevices > 0)
   {
     // Get the camera guids as a parameter.
@@ -510,6 +512,7 @@ int main(int argc, char** argv)
         ("sendcommand", std::bind(&sendCommand_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
 
 
+    g_timeout_add_seconds(10, CameraManager::update_callback, &cameraManager);
     g_timeout_add_seconds(0.1, PeriodicTask_callback, &applicationdata);
 
     void (*pSigintHandlerOld)(int);
