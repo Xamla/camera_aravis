@@ -326,16 +326,12 @@ void GenicamFeatures::write_features_from_rosparam(std::shared_ptr<ros::NodeHand
 
   if (xmlrpcParams.getType() == XmlRpc::XmlRpcValue::TypeStruct)
   {
-    ROS_ERROR("size of parameter %d", xmlrpcParams.size());
     for (auto xmlrpcParam : xmlrpcParams)
     {
-      ROS_ERROR("parameter feature %s", xmlrpcParam.first.c_str());
       if(is_implemented(xmlrpcParam.first))
       {
-        ROS_ERROR("parameter feature %d", xmlrpcParam.second.getType());
         if(xmlrpcParam.second.getType() == XmlRpc::XmlRpcValue::TypeString)
         {
-          ROS_ERROR("internal type %d", features[xmlrpcParam.first]->get_feature_type());
           features[xmlrpcParam.first]->set_current_value(pDevice, xmlrpcParam.second);
         }
         else

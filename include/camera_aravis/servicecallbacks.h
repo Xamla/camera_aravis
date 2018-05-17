@@ -49,11 +49,11 @@ bool capture_callback(camera_aravis::CaptureRequest& request,
       }
 
       if(iter != cameras.end() &&
-         (iter->second.state == State::READY ||
-          iter->second.state == State::STREAMING))
+         (iter->second.state == CameraState::READY ||
+          iter->second.state == CameraState::STREAMING))
       {
         changedTriggerProperties = true;
-        if(iter->second.state == State::STREAMING)
+        if(iter->second.state == CameraState::STREAMING)
         {
           wasStreaming = true;
           arv_device_execute_command(iter->second.pDevice,
@@ -125,8 +125,8 @@ bool getConnectedDevices_callback(camera_aravis::GetConnectedDevicesRequest& req
 {
   for(auto& camera : cameras)
   {
-    if(camera.second.state == State::READY ||
-       camera.second.state == State::STREAMING)
+    if(camera.second.state == CameraState::READY ||
+       camera.second.state == CameraState::STREAMING)
     {
       response.serials.push_back(camera.first);
     }
@@ -152,10 +152,10 @@ bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
       }
 
       if(iter != cameras.end() &&
-         (iter->second.state == State::READY ||
-          iter->second.state == State::STREAMING))
+         (iter->second.state == CameraState::READY ||
+          iter->second.state == CameraState::STREAMING))
       {
-        if(iter->second.state == State::STREAMING)
+        if(iter->second.state == CameraState::STREAMING)
         {
           wasStreaming = true;
           arv_device_execute_command(iter->second.pDevice,
