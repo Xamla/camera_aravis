@@ -64,24 +64,23 @@ void CameraManager::initializeDevices(bool is_first_time)
                  serial_deviceID.first) != requested_cameras.end())
     {
       auto iter = cameras.find(serial_deviceID.first);
-      if( iter != cameras.end() && iter->second.getCameraState() == CameraState::NOTINITIALIZED)
+      if( iter != cameras.end() && iter->second->getCameraState() == CameraState::NOTINITIALIZED)
       {
         ROS_INFO("Reactivate camera: %s  with device id: %s",
                  serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
 
-        iter->second.reestablishConnection(phNodeHandle,
-                                           serial_deviceID);
+        iter->second->reestablishConnection(phNodeHandle,
+                                            serial_deviceID);
       }
       else
       {
         // Open the camera, and set it up.
         ROS_INFO("Add requested camera: %s  with device id: %s",
                  serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
-/*
+
         cameras.emplace(std::piecewise_construct,
                         std::forward_as_tuple(serial_deviceID.first),
-                        std::forward_as_tuple(GeniCam(phNodeHandle,
-                                                      serial_deviceID)));*/
+                        std::forward_as_tuple(std::make_shared<GeniCam>(phNodeHandle, serial_deviceID)));
       }
     }
 

@@ -21,7 +21,7 @@ protected:
 
   std::vector<std::string> requested_cameras;
 
-  std::unordered_map<std::string, GeniCam> cameras;
+  std::unordered_map<std::string, std::shared_ptr<GeniCam>> cameras;
 };
 
 #endif // CAMERAMANAGER_H

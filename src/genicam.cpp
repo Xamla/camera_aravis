@@ -39,8 +39,12 @@ GeniCam::GeniCam(std::shared_ptr<ros::NodeHandle> &phNode, const std::pair<const
 
 GeniCam::~GeniCam()
 {
-  arv_device_execute_command(pDevice,
-                             "AcquisitionStop");
+  if(cameraState.load() != CameraState::NOTINITIALIZED)
+  {
+    arv_device_execute_command(pDevice,
+                               "AcquisitionStop");
+  }
+
   handleConnectionLoss();
 }
 
