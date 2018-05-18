@@ -57,6 +57,7 @@ void GeniCam::newbuffer_callback(ArvStream *pStream, GeniCam *pCameradata)
 
 void GeniCam::connectionlost_callback(ArvGvDevice *pGvDevice, GeniCam *pCameradata)
 {
+  ROS_WARN("Connection loss detected");
   pCameradata->handleConnectionLoss();
 }
 

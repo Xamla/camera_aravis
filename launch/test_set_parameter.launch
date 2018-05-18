@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <launch>
   <node name="camera_aravis_node" pkg="camera_aravis" type="camera_aravis_node" output="screen">
-    <param name="camera_serials" value="['4103217455']" />
+    <rosparam param="camera_serials">['4103217455']</rosparam>
     <rosparam ns="4103217455/feature">
       ExposureTime: '30000'
       LineSelector: 'Line3'

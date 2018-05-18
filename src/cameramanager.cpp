@@ -47,13 +47,13 @@ void CameraManager::initializeDevices(bool is_first_time)
       phNodeHandle->getParam(ros::this_node::getName() + "/camera_serials",
                               requested_cameras);
     }
+  }
 
-    if (requested_cameras.size()==0)
+  if (requested_cameras.size()==0)
+  {
+    for(auto &serial_deviceID : available_cameras)
     {
-      for(auto &serial_deviceID : available_cameras)
-      {
-        requested_cameras.push_back(serial_deviceID.first);
-      }
+      requested_cameras.push_back(serial_deviceID.first);
     }
   }
 
@@ -72,7 +72,7 @@ void CameraManager::initializeDevices(bool is_first_time)
         iter->second->reestablishConnection(phNodeHandle,
                                             serial_deviceID);
       }
-      else
+      else if(iter == cameras.end())
       {
         // Open the camera, and set it up.
         ROS_INFO("Add requested camera: %s  with device id: %s",
