@@ -177,6 +177,7 @@ void GeniCam::showStatistic()
 
 bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 {
+  std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
   bool wasStreaming = false;
   bool changedTriggerProperties = false;
   try
@@ -186,13 +187,12 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
        genicamFeatures.is_implemented("AcquisitionMode") ||
        genicamFeatures.is_implemented("ExposureTime"))
     {
-      std::runtime_error("Cature Service: can not be used because "
+      std::runtime_error("Capture: can not be used because "
                          "software and hardware triggering is not "
                          "supported by camera with serial number: " + serialNumber);
     }
 
-    if(cameraState.load() == CameraState::READY ||
-       cameraState.load() == CameraState::STREAMING)
+    if(cameraState.load() != CameraState::NOTINITIALIZED)
     {
       changedTriggerProperties = true;
       if(cameraState.load() == CameraState::STREAMING)
@@ -212,14 +212,14 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 
       arv_device_execute_command(pDevice, "TriggerSoftware");
 
-      std::unique_lock<std::mutex> lck(captureLock);
+      std::unique_lock<std::mutex> lck(imageWaitMutex);
       if(newImageAvailable.wait_for(lck, exposure_time*3)==std::cv_status::no_timeout)
       {
         imageContainer.push_back(imageMsg);
       }
       else
       {
-        throw std::runtime_error("Cature Service: after 3 times the "
+        throw std::runtime_error("Capture: after 3 times the "
                                  "exposure time a new image was still "
                                  "not available abort; serial: " + serialNumber);
       }
@@ -227,10 +227,9 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     }
     else
     {
-      std::runtime_error("Cature Service: camera with serial "
+      std::runtime_error("Capture: camera with serial "
                          + serialNumber + "is not available");
     }
-
   } catch(const std::exception& e)
   {
     if(changedTriggerProperties)
@@ -242,6 +241,48 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     return false;
   }
   return true;
+}
+
+bool GeniCam::tryToSetFeatureValue(const std::string &feature, const std::string &value)
+{
+  bool wasStreaming = false;
+  if(genicamFeatures.is_implemented(feature) &&
+     (cameraState.load() != CameraState::NOTINITIALIZED))
+  {
+    std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
+    if(cameraState.load() == CameraState::STREAMING)
+    {
+      wasStreaming = true;
+      arv_device_execute_command(pDevice,
+                               "AcquisitionStop");
+    }
+
+    genicamFeatures.get_feature(feature)->set_current_value(
+          pDevice, value);
+
+    if(wasStreaming == true)
+    {
+      arv_device_execute_command(pDevice,
+                               "AcquisitionStart");
+    }
+    return true;
+  }
+  return false;
+}
+
+bool GeniCam::tryToGetFeatureValue(const std::string &feature, std::string &value)
+{
+  if(genicamFeatures.is_implemented(feature))
+  {
+    if(cameraState.load() != CameraState::NOTINITIALIZED)
+    {
+      value = genicamFeatures.get_feature(feature)->get_current_value(pDevice);
+    }
+    return true;
+  }
+  else
+
+  return false;
 }
 
 // -- private methods --
@@ -401,25 +442,26 @@ void GeniCam::handleConnectionLoss()
 void GeniCam::connectCallback()
 {
   if (publisher.getNumSubscribers() == 1){
+    std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
     cameraState.store(CameraState::STREAMING);
     arv_device_execute_command(pDevice,
                                "AcquisitionStart");
 
     std::string info_text = "someone subscribe to topic " + publisher.getTopic() + " start continuous image aquisition";
-    ROS_INFO(info_text.c_str());
+    ROS_INFO("%s",info_text.c_str());
   }
 }
 
 void GeniCam::disconnectCallback()
 {
   if (publisher.getNumSubscribers() == 0){
-
+    std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
     cameraState.store(CameraState::READY);
     arv_device_execute_command(pDevice,
                                "AcquisitionStop");
 
     std::string info_text = "number of subscribers to topic " + publisher.getTopic() + " falls to 0. Continuous image aquisition stopped";
-    ROS_INFO(info_text.c_str());
+    ROS_INFO("%s", info_text.c_str());
   }
 }
 

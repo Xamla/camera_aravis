@@ -37,7 +37,8 @@ public:
 
   bool capture(std::vector<sensor_msgs::Image>& imageContainer);
 
-  bool tryToGetFeature(std::shared_ptr<genicam_features::FeatureProperties>& feature);
+  bool tryToSetFeatureValue(const std::string& feature, const std::string& value);
+  bool tryToGetFeatureValue(const std::string& feature, std::string &value);
 
 protected:
 
@@ -59,7 +60,8 @@ protected:
 
   //conditional variable and mutex to wait for new image
   std::condition_variable newImageAvailable;
-  std::mutex captureLock;
+  std::mutex imageWaitMutex;
+  std::mutex aquisitionChangeMutex;
 
   //ros specific
   std::shared_ptr<image_transport::ImageTransport> pImageTransport;

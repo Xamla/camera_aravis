@@ -40,11 +40,7 @@
 
 #include <sensor_msgs/image_encodings.h>
 
-//#include "camera_aravis/servicecallbacks.h"
 #include "camera_aravis/cameramanager.h"
-
-//#define TUNING	// Allows tuning the gains for the timestamp controller.
-//Publishes output on topic /dt, and receives gains on params /kp, /ki, /kd
 
 // Global variables -------------------
 
@@ -91,23 +87,6 @@ int main(int argc, char** argv)
 
   CameraManager cameraManager(phNode);
 
-/*
-  ros::ServiceServer captureServiceServer =
-      global.phNode->advertiseService<camera_aravis::CaptureRequest,
-                                      camera_aravis::CaptureResponse>
-      ("capture", std::bind(&capture_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
-
-  ros::ServiceServer getConnectedDevicesServiceServer =
-      global.phNode->advertiseService<camera_aravis::GetConnectedDevicesRequest,
-                                      camera_aravis::GetConnectedDevicesResponse>
-      ("getconnecteddevices", std::bind(&getConnectedDevices_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
-
-  ros::ServiceServer sendCommandServiceServer =
-      global.phNode->advertiseService<camera_aravis::SendCommandRequest,
-                                      camera_aravis::SendCommandResponse>
-      ("sendcommand", std::bind(&sendCommand_callback, std::placeholders::_1, std::placeholders::_2, std::ref(global.cameras)));
-
-*/
   g_timeout_add_seconds(30, CameraManager::update_callback, &cameraManager);
   g_timeout_add_seconds(0.1, PeriodicTask_callback, &global);
 

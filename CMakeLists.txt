@@ -44,7 +44,7 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${ARAVIS_INCLUDE_PATH} ${GLIB
 message(${ARAVIS_LIBRARY})
 
 add_executable(${PROJECT_NAME}_node
-    src/camnode.cpp src/genicamfeatures.cpp
+    src/cameranode.cpp src/genicamfeatures.cpp
     src/cameramanager.cpp src/genicam.cpp)
 
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${ARAVIS_LIBRARY} glib-2.0 gmodule-2.0 gobject-2.0)
