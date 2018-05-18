@@ -69,8 +69,7 @@ void CameraManager::initializeDevices(bool is_first_time)
         ROS_INFO("Reactivate camera: %s  with device id: %s",
                  serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
 
-        iter->second->reestablishConnection(phNodeHandle,
-                                            serial_deviceID);
+        iter->second->reestablishConnection(phNodeHandle);
       }
       else if(iter == cameras.end())
       {

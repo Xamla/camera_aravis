@@ -29,21 +29,20 @@ public:
   static void connectionlost_callback(ArvGvDevice* pGvDevice,
                                       GeniCam* pCameradata);
 
-  bool reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode,
-                             const std::pair<const std::string, std::string> &serial_deviceid);
+  bool reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode);
 
   enum CameraState getCameraState();
 
   void showStatistic();
 
-  bool capture();
+  bool capture(std::vector<sensor_msgs::Image>& imageContainer);
 
-
+  bool tryToGetFeature(std::shared_ptr<genicam_features::FeatureProperties>& feature);
 
 protected:
 
   //-----methods-----
-  ArvGvStream* CreateStream(const std::string &camera_serial);
+  ArvGvStream* createStream(const std::string &camera_serial);
 
   void processNewBuffer(ArvStream* pStream);
   void handleConnectionLoss();
@@ -51,9 +50,11 @@ protected:
   void connectCallback();
   void disconnectCallback();
 
-
+  void restoreAquistionsMode(const bool& wasStreaming);
 
   //----attributes---
+  std::string serialNumber;
+  std::string deviceID;
   std::atomic<CameraState> cameraState;
 
   //conditional variable and mutex to wait for new image
@@ -72,6 +73,9 @@ protected:
   ArvDevice* pDevice;
   ArvGvStream* pStream;
 
+  gulong newbufferHandlerID;
+  gulong connectionLostHandlerID;
+
   // genicam feaures
   genicam_features::GenicamFeatures genicamFeatures;
 
@@ -89,9 +93,9 @@ protected:
   size_t nBuffers; // Counter for Hz calculation.
 
   // time compensation related things
-  uint64_t cm = 0L; // Camera time prev
-  uint64_t tm = 0L; // Calculated image time prev
-  int64_t em = 0L; // Error prev.
+  uint64_t cm;// Camera time prev
+  uint64_t tm;// Calculated image time prev
+  int64_t em;// Error prev.
 };
 
 #endif // GENICAM_H

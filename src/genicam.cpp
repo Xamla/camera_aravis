@@ -34,17 +34,13 @@ GeniCam::GeniCam(std::shared_ptr<ros::NodeHandle> &phNode, const std::pair<const
                        ros::NodeHandle(ros::this_node::getName()+"/"+serial_deviceid.first),
                        serial_deviceid.first))
 {
-  reestablishConnection(phNode, serial_deviceid);
+  serialNumber = serial_deviceid.first;
+  deviceID = serial_deviceid.second;
+  reestablishConnection(phNode);
 }
 
 GeniCam::~GeniCam()
 {
-  if(cameraState.load() != CameraState::NOTINITIALIZED)
-  {
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
-  }
-
   handleConnectionLoss();
 }
 
@@ -61,18 +57,17 @@ void GeniCam::connectionlost_callback(ArvGvDevice *pGvDevice, GeniCam *pCamerada
   pCameradata->handleConnectionLoss();
 }
 
-bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode,
-                                    const std::pair<const std::string, std::string> &serial_deviceid)
+bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
 {
   cameraState.store(CameraState::NOTINITIALIZED);
 
   try
   {
     pCamera = NULL;
-    pCamera = arv_camera_new(serial_deviceid.second.c_str());
+    pCamera = arv_camera_new(deviceID.c_str());
     if (!pCamera)
     {
-      throw std::runtime_error(("camera with ID: "+ serial_deviceid.first +" could not be opened. skip."));
+      throw std::runtime_error(("camera with ID: "+ serialNumber +" could not be opened. skip."));
     }
 
     pDevice = arv_camera_get_device(pCamera);
@@ -83,35 +78,35 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode,
 
     pStream = NULL;
 
-    pStream = CreateStream(serial_deviceid.first);
+    pStream = createStream(serialNumber);
     if (!pStream)
     {
-      throw std::runtime_error(("stream for camera with ID: "+ serial_deviceid.first +" could not be opened. skip."));
+      throw std::runtime_error(("stream for camera with ID: "+ serialNumber +" could not be opened. skip."));
     }
 
     // Set up image_raw.
     publisher = pImageTransport->advertiseCamera(
-        ros::this_node::getName() + "/" + serial_deviceid.first + "/image_raw", 1,
+        ros::this_node::getName() + "/" + serialNumber + "/image_raw", 1,
         std::bind(&GeniCam::connectCallback, this),
         std::bind(&GeniCam::disconnectCallback, this));
 
     // Connect signals with callbacks.
-    g_signal_connect(pStream,
+    newbufferHandlerID = g_signal_connect(pStream,
                      "new-buffer", G_CALLBACK(GeniCam::newbuffer_callback),
                      this);
-    g_signal_connect(pDevice, "control-lost",
+    connectionLostHandlerID = g_signal_connect(pDevice, "control-lost",
                      G_CALLBACK(GeniCam::connectionlost_callback),
                      this);
 
     if (!genicamFeatures.init(
-          phNode, pDevice, serial_deviceid.first))
+          phNode, pDevice, serialNumber))
     {
-      throw std::runtime_error("parameter for camera with ID: " + serial_deviceid.first +" could not be initialized. skip");
+      throw std::runtime_error("parameter for camera with ID: " + serialNumber +" could not be initialized. skip");
     }
 
-    frame_id = "camera_"+serial_deviceid.first;
+    frame_id = "camera_"+serialNumber;
     phNode->getParam(ros::this_node::getName() + "/" +
-                     serial_deviceid.first + "/frame_id",
+                     serialNumber + "/frame_id",
                      frame_id);
 
     sequenceCounter = 0;
@@ -180,9 +175,78 @@ void GeniCam::showStatistic()
   }
 }
 
+bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
+{
+  bool wasStreaming = false;
+  bool changedTriggerProperties = false;
+  try
+  {
+    if(genicamFeatures.is_implemented("TriggerMode") ||
+       genicamFeatures.is_implemented("TriggerSource") ||
+       genicamFeatures.is_implemented("AcquisitionMode") ||
+       genicamFeatures.is_implemented("ExposureTime"))
+    {
+      std::runtime_error("Cature Service: can not be used because "
+                         "software and hardware triggering is not "
+                         "supported by camera with serial number: " + serialNumber);
+    }
+
+    if(cameraState.load() == CameraState::READY ||
+       cameraState.load() == CameraState::STREAMING)
+    {
+      changedTriggerProperties = true;
+      if(cameraState.load() == CameraState::STREAMING)
+      {
+        wasStreaming = true;
+        arv_device_execute_command(pDevice,
+                                 "AcquisitionStop");
+      }
+
+      arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
+      arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
+      arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
+      std::chrono::microseconds exposure_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+
+      arv_device_execute_command(pDevice,
+                               "AcquisitionStart");
+
+      arv_device_execute_command(pDevice, "TriggerSoftware");
+
+      std::unique_lock<std::mutex> lck(captureLock);
+      if(newImageAvailable.wait_for(lck, exposure_time*3)==std::cv_status::no_timeout)
+      {
+        imageContainer.push_back(imageMsg);
+      }
+      else
+      {
+        throw std::runtime_error("Cature Service: after 3 times the "
+                                 "exposure time a new image was still "
+                                 "not available abort; serial: " + serialNumber);
+      }
+      restoreAquistionsMode(wasStreaming);
+    }
+    else
+    {
+      std::runtime_error("Cature Service: camera with serial "
+                         + serialNumber + "is not available");
+    }
+
+  } catch(const std::exception& e)
+  {
+    if(changedTriggerProperties)
+    {
+      restoreAquistionsMode(wasStreaming);
+    }
+
+    ROS_WARN("%s", e.what());
+    return false;
+  }
+  return true;
+}
+
 // -- private methods --
 
-ArvGvStream* GeniCam::CreateStream(const std::string &camera_serial)
+ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
@@ -316,9 +380,19 @@ void GeniCam::handleConnectionLoss()
 {
   if(cameraState.load() != CameraState::NOTINITIALIZED)
   {
+    arv_device_execute_command(pDevice,
+                               "AcquisitionStop");
+
     publisher.shutdown();
-    g_object_unref(pStream);
-    g_object_unref(pCamera);
+
+    arv_stream_set_emit_signals(
+          (ArvStream*)pStream, FALSE);
+
+    g_signal_handler_disconnect(pStream, newbufferHandlerID);
+    g_signal_handler_disconnect(pDevice, connectionLostHandlerID);
+
+    g_clear_object(&pStream);
+    g_clear_object(&pStream);
 
     cameraState.store(CameraState::NOTINITIALIZED);
   }
@@ -346,5 +420,18 @@ void GeniCam::disconnectCallback()
 
     std::string info_text = "number of subscribers to topic " + publisher.getTopic() + " falls to 0. Continuous image aquisition stopped";
     ROS_INFO(info_text.c_str());
+  }
+}
+
+void GeniCam::restoreAquistionsMode(const bool &wasStreaming)
+{
+  arv_device_execute_command(pDevice, "AcquisitionStop");
+  arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "Continuous");
+  arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
+
+  if(wasStreaming)
+  {
+    arv_device_execute_command(pDevice,
+                             "AcquisitionStart");
   }
 }
