@@ -1,6 +1,5 @@
 string[] serials         # serial numbers to select specific cameras (emtpy string means all cameras)
-string command_name
-float32 value
+int64 io_port # io which should be switched (correspond not with the io number in the datacheat of the camera)
+bool value
 ---
 string response
-

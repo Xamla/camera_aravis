@@ -16,11 +16,11 @@ public:
     return std::to_string(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
   }
 
-  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  bool set_current_value(ArvDevice* pDevice, const std::string& value) override
   {
     try
     {
-      if(iequals(value, "true") || std::stoi(value) > 1)
+      if(iequals(value, "true") || std::stoi(value) >= 1)
       {
         arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), 1);
       }
@@ -33,7 +33,9 @@ public:
     } catch (const std::exception& e)
     {
       ROS_WARN(("Could not set value for feature " + feature_name + " because of following exception: " + e.what()).c_str());
+      return false;
     }
+    return true;
   }
 
 protected:
@@ -60,7 +62,7 @@ public:
     return std::to_string(arv_device_get_integer_feature_value(pDevice, feature_name.c_str()));
   }
 
-  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  bool set_current_value(ArvDevice* pDevice, const std::string& value) override
   {
     gint64 valueI;
     gint64 min, max;
@@ -73,6 +75,7 @@ public:
       ROS_WARN(("Warning: Try to set feature" + feature_name +
                 " but it was not possible to convert " + value +
                 " to int. Do nothing").c_str());
+      return false;
     }
 
     arv_device_get_integer_feature_bounds(pDevice, feature_name.c_str(), &min, &max);
@@ -93,6 +96,8 @@ public:
     }
     else
       arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), valueI);
+
+    return true;
   }
 };
 
@@ -107,7 +112,7 @@ public:
     return std::to_string(arv_device_get_float_feature_value(pDevice, feature_name.c_str()));
   }
 
-  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  bool set_current_value(ArvDevice* pDevice, const std::string& value) override
   {
     double valueD;
     double min, max;
@@ -120,6 +125,7 @@ public:
       ROS_WARN(("Warning: Try to set feature" + feature_name +
                 " but it was not possible to convert " + value +
                 " to double. Do nothing").c_str());
+      return false;
     }
 
     arv_device_get_float_feature_bounds(pDevice, feature_name.c_str(), &min, &max);
@@ -140,6 +146,8 @@ public:
     }
     else
       arv_device_set_float_feature_value(pDevice, feature_name.c_str(), valueD);
+
+    return true;
   }
 };
 
@@ -154,9 +162,10 @@ public:
     return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
   }
 
-  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  bool set_current_value(ArvDevice* pDevice, const std::string& value) override
   {
     arv_device_set_string_feature_value(pDevice, feature_name.c_str(), value.c_str());
+    return true;
   }
 };
 
@@ -170,7 +179,7 @@ public:
     return std::string(arv_device_get_string_feature_value(pDevice, feature_name.c_str()));
   }
 
-  void set_current_value(ArvDevice* pDevice, const std::string& value) override
+  bool set_current_value(ArvDevice* pDevice, const std::string& value) override
   {
     guint i;
     guint size = 0;
@@ -186,12 +195,14 @@ public:
     if (i<size)
     {
       arv_device_set_string_feature_value(pDevice, feature_name.c_str(),value.c_str());
+      return true;
     }
     else
     {
       ROS_WARN(("Enum Warning: Try to set enum feature "+ feature_name
                + " to " + value + " but this is not available. Do nothing").c_str());
     }
+    return false;
   }
 };
 
@@ -214,7 +225,7 @@ std::string FeatureProperties::get_current_value(ArvDevice* pDevice)
   return "";
 }
 
-void FeatureProperties::set_current_value(ArvDevice* pDevice, const std::string& value)
+bool FeatureProperties::set_current_value(ArvDevice* pDevice, const std::string& value)
 {
   ROS_WARN("use set_current_value function of base class FeatureProperties");
 }

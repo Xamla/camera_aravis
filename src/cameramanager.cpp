@@ -20,6 +20,11 @@ CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
       phNodeHandle->advertiseService<camera_aravis::SendCommandRequest,
                                       camera_aravis::SendCommandResponse>
       ("sendcommand", std::bind(&CameraManager::sendCommand_callback, this, std::placeholders::_1, std::placeholders::_2));
+
+  setIOServiceServer =
+      phNodeHandle->advertiseService<camera_aravis::SetIORequest,
+                                      camera_aravis::SetIOResponse>
+      ("setio", std::bind(&CameraManager::setIO_callback, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 gboolean CameraManager::update_callback(void *cameraManager)
@@ -36,11 +41,10 @@ void CameraManager::initializeDevices(bool is_first_time)
   std::unordered_map<std::string, std::string> available_cameras;
 
   // Print out some useful info.
-  ROS_INFO("Update Device List:");
+//  ROS_INFO("Update Device List:");
   arv_update_device_list();
-
   nDevices = arv_get_n_devices();
-  ROS_INFO("# Number of found Devices: %d", nDevices);
+//  ROS_INFO("# Number of found Devices: %d", nDevices);
   for (int i = 0; i < nDevices; i++)
   {
     std::string device_ID = arv_get_device_id(i);
@@ -81,7 +85,7 @@ void CameraManager::initializeDevices(bool is_first_time)
       auto iter = cameras.find(serial_deviceID.first);
       if( iter != cameras.end() && iter->second->getCameraState() == CameraState::NOTINITIALIZED)
       {
-        ROS_INFO("Reactivate camera: %s  with device id: %s",
+        ROS_INFO("Try to reconnect to camera: %s  with device id: %s",
                  serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
 
         iter->second->reestablishConnection(phNodeHandle);
@@ -117,14 +121,14 @@ bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
           response.serials.push_back(serial);
         else
         {
-          std::runtime_error("Capture Service: problem to capture an"
-                             "image, abort complete process");
+          throw std::runtime_error("Capture Service: image capture timeout for camera with serial " + serial +
+                                   ", abort complete process");
         }
       }
       else
       {
-        std::runtime_error("Capture Service: camera with serial "
-                           + serial + "is not available , "
+        throw std::runtime_error("Capture Service: camera with serial "
+                           + serial + " is not available, "
                                       "abort complete process");
       }
 
@@ -165,14 +169,15 @@ bool CameraManager::sendCommand_callback(camera_aravis::SendCommandRequest &requ
       {
         if(!iter->second->tryToSetFeatureValue(request.command_name, std::to_string(request.value)))
         {
-          std::runtime_error("sendCommand Service: feature could not"
-                             "be set, abort");
+          throw std::runtime_error("sendCommand Service: requested feature: " + request.command_name +
+                                   "is not available for or could not be set"
+                                   "camera with serial " + serial + " , abort");
         }
       }
       else
       {
-        std::runtime_error("sendCommand Service: camera with serial "
-                           + serial + "is not available, abort process");
+        throw std::runtime_error("sendCommand Service: camera with serial "
+                           + serial + " is not available, abort process");
       }
 
     }
@@ -180,7 +185,54 @@ bool CameraManager::sendCommand_callback(camera_aravis::SendCommandRequest &requ
     {
       response.response = "only the command for cameras before the camera with serial "
                           "number " + serial + " could be executed";
-      ROS_WARN(e.what());
+      ROS_WARN("%s", e.what());
+      return false;
+    }
+  }
+  response.response="everthing works fine";
+  return true;
+}
+
+bool CameraManager::setIO_callback(camera_aravis::SetIORequest &request,
+                                   camera_aravis::SetIOResponse &response)
+{
+  bool isOK = false;
+  std::string line = "Line"+std::to_string(request.io_port);
+  std::string userOutput = "UserOutput"+std::to_string(request.io_port);
+
+  for(auto &serial : request.serials )
+  {
+    auto iter = cameras.find(serial);
+    try
+    {
+      if(iter != cameras.end() &&
+         (iter->second->getCameraState() != CameraState::NOTINITIALIZED))
+      {
+        isOK = iter->second->tryToSetFeatureValue("LineSelector", line.c_str());
+        isOK = iter->second->tryToSetFeatureValue("LineMode", "Output");
+        isOK = iter->second->tryToSetFeatureValue("LineSource", userOutput.c_str());
+        isOK = iter->second->tryToSetFeatureValue("UserOutputSelector", userOutput.c_str());
+        isOK = iter->second->tryToSetFeatureValue("UserOutputValue", std::to_string(request.value).c_str());
+
+        if(!isOK)
+        {
+          throw std::runtime_error("setIO Service: requested io: " + std::to_string(request.io_port) +
+                                   " could not be set"
+                                   "for camera with serial " + serial + " , abort");
+        }
+      }
+      else
+      {
+        throw std::runtime_error("setIO Service: camera with serial "
+                           + serial + " is not available, abort process");
+      }
+
+    }
+    catch(const std::exception &e)
+    {
+      response.response = "only the command for cameras before the camera with serial "
+                          "number " + serial + " could be executed";
+      ROS_WARN("%s", e.what());
       return false;
     }
   }

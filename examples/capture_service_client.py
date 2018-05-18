@@ -14,8 +14,8 @@ def call_getconnecteddevices_service():
   try:
     getSerials = rospy.ServiceProxy('camera_aravis_node/getconnecteddevices', GetConnectedDevices)
     resp = getSerials()
-    
-    return resp.serials
+    temp = ['12']
+    return temp#resp.serials
 
   except rospy.ServiceException, e:
     print "Service call failed: %s"%e
@@ -47,7 +47,7 @@ def main():
 
   serials = call_getconnecteddevices_service()
 
-  if len(serials)>1:
+  if len(serials)>=1:
     print('request image from following cameras:')
     for serial in serials:
       print('Camera with serial number: ' + str(serial))

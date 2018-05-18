@@ -16,11 +16,11 @@ def call_getconnecteddevices_service():
   except rospy.ServiceException, e:
     print "Service call failed: %s"%e
 
-def call_sendcommand_service(serials, command, value):
-  rospy.wait_for_service('camera_aravis_node/sendcommand')
+def call_setIO_service(serials, port, value):
+  rospy.wait_for_service('camera_aravis_node/setio')
   try:
-    sendCommand = rospy.ServiceProxy('camera_aravis_node/sendcommand', SendCommand)
-    resp = sendCommand(serials, command, value)
+    setIO = rospy.ServiceProxy('camera_aravis_node/setio', SetIO)
+    resp = setIO(serials, port, value)
     
     print(resp.response)
 
@@ -31,7 +31,8 @@ def main():
 
   serials = call_getconnecteddevices_service()
 
-  call_sendcommand_service(serials, "ExposureTime", 5000.0)
+  #call_setIO_service(serials, 3, True)
+  call_setIO_service(serials, 3, False)
 
 if __name__ == "__main__":
   main()

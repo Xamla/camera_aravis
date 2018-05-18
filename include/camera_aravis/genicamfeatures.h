@@ -21,7 +21,7 @@ public:
   FeatureType get_feature_type();
 
   virtual std::string get_current_value(ArvDevice* pDevice);
-  virtual void set_current_value(ArvDevice* pDevice, const std::string& value);
+  virtual bool set_current_value(ArvDevice* pDevice, const std::string& value);
 
 protected:
   std::string feature_name;

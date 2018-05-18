@@ -4,12 +4,6 @@
     <rosparam param="camera_serials">['4103217455']</rosparam>
     <rosparam ns="4103217455/feature">
       ExposureTime: '30000'
-      LineSelector: 'Line3'
-      LineSource: 'UserOutput3'
-      LineMode: 'Output'
-      LineSource: 'UserOutput3'
-      UserOutputSelector: 'UserOutput3'
-      UserOutputValue: 'true'
     </rosparam>
   </node>
 </launch>

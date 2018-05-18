@@ -4,6 +4,7 @@
 #include <camera_aravis/Capture.h>
 #include <camera_aravis/GetConnectedDevices.h>
 #include <camera_aravis/SendCommand.h>
+#include <camera_aravis/SetIO.h>
 
 #include "camera_aravis/genicam.h"
 
@@ -24,6 +25,9 @@ public:
   bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
                        camera_aravis::SendCommandResponse& response);
 
+  bool setIO_callback(camera_aravis::SetIORequest& request,
+                      camera_aravis::SetIOResponse& response);
+
 protected:
   //search for new devices and initialize
   //them when device is requested
@@ -39,6 +43,7 @@ protected:
   ros::ServiceServer captureServiceServer;
   ros::ServiceServer getConnectedDevicesServiceServer;
   ros::ServiceServer sendCommandServiceServer;
+  ros::ServiceServer setIOServiceServer;
 };
 
 #endif // CAMERAMANAGER_H

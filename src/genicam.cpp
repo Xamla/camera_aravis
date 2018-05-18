@@ -144,7 +144,7 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
 
   } catch (const std::exception& e)
   {
-    ROS_WARN(e.what());
+    ROS_WARN("%s", e.what());
     return false;
   }
 }
@@ -187,7 +187,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
        genicamFeatures.is_implemented("AcquisitionMode") ||
        genicamFeatures.is_implemented("ExposureTime"))
     {
-      std::runtime_error("Capture: can not be used because "
+      throw std::runtime_error("Capture: can not be used because "
                          "software and hardware triggering is not "
                          "supported by camera with serial number: " + serialNumber);
     }
@@ -227,7 +227,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     }
     else
     {
-      std::runtime_error("Capture: camera with serial "
+      throw std::runtime_error("Capture: camera with serial "
                          + serialNumber + "is not available");
     }
   } catch(const std::exception& e)
@@ -246,6 +246,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 bool GeniCam::tryToSetFeatureValue(const std::string &feature, const std::string &value)
 {
   bool wasStreaming = false;
+  bool setSucessful = false;
   if(genicamFeatures.is_implemented(feature) &&
      (cameraState.load() != CameraState::NOTINITIALIZED))
   {
@@ -257,7 +258,7 @@ bool GeniCam::tryToSetFeatureValue(const std::string &feature, const std::string
                                "AcquisitionStop");
     }
 
-    genicamFeatures.get_feature(feature)->set_current_value(
+    setSucessful = genicamFeatures.get_feature(feature)->set_current_value(
           pDevice, value);
 
     if(wasStreaming == true)
@@ -265,9 +266,9 @@ bool GeniCam::tryToSetFeatureValue(const std::string &feature, const std::string
       arv_device_execute_command(pDevice,
                                "AcquisitionStart");
     }
-    return true;
   }
-  return false;
+  if(setSucessful == true) return true;
+  else return false;
 }
 
 bool GeniCam::tryToGetFeatureValue(const std::string &feature, std::string &value)

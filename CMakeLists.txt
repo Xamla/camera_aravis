@@ -24,6 +24,7 @@ add_service_files(
     Capture.srv
     GetConnectedDevices.srv
     SendCommand.srv
+    SetIO.srv
 )
 
 generate_messages(
