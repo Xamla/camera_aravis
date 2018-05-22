@@ -90,7 +90,7 @@ int main(int argc, char** argv)
   CameraManager cameraManager(phNode);
 
   g_timeout_add_seconds(10, CameraManager::update_callback, &cameraManager);
-  g_timeout_add(50, PeriodicTask_callback, &cameraManager);
+  g_timeout_add(200, PeriodicTask_callback, &cameraManager);
 
   void (*pSigintHandlerOld)(int);
   pSigintHandlerOld = signal(SIGINT, set_cancel);
