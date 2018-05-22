@@ -32,7 +32,7 @@ public:
         throw std::runtime_error("value could not be converted to bool");
     } catch (const std::exception& e)
     {
-      ROS_WARN(("Could not set value for feature " + feature_name + " because of following exception: " + e.what()).c_str());
+      ROS_WARN("%s", ("Could not set value for feature " + feature_name + " because of following exception: " + e.what()).c_str());
       return false;
     }
     return true;
@@ -72,7 +72,7 @@ public:
       valueI = std::stoi(value);
     } catch(const std::exception &e)
     {
-      ROS_WARN(("Warning: Try to set feature" + feature_name +
+      ROS_WARN("%s", ("Warning: Try to set feature" + feature_name +
                 " but it was not possible to convert " + value +
                 " to int. Do nothing").c_str());
       return false;
@@ -82,14 +82,14 @@ public:
 
     if(valueI > max)
     {
-      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+      ROS_WARN("%s", ("Boundary Warning: Try to set feature "+ feature_name
                + "to " + std::to_string(valueI) + "but max value is " +
                std::to_string(max) + ". Therefore it is set to max value").c_str());
       arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), max);
     }
     else if(valueI < min)
     {
-      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+      ROS_WARN("%s", ("Boundary Warning: Try to set feature "+ feature_name
                + "to " + std::to_string(valueI) + "but min value is "
                + std::to_string(max) + ". Therefore it is set to min value").c_str());
       arv_device_set_integer_feature_value(pDevice, feature_name.c_str(), min);
@@ -122,7 +122,7 @@ public:
       valueD = std::stod(value);
     } catch(const std::exception &e)
     {
-      ROS_WARN(("Warning: Try to set feature" + feature_name +
+      ROS_WARN("%s", ("Warning: Try to set feature" + feature_name +
                 " but it was not possible to convert " + value +
                 " to double. Do nothing").c_str());
       return false;
@@ -132,14 +132,14 @@ public:
 
     if(valueD > max)
     {
-      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+      ROS_WARN("%s", ("Boundary Warning: Try to set feature "+ feature_name
                + "to " + std::to_string(valueD) + "but max value is " +
                std::to_string(max) + ". Therefore it is set to max value").c_str());
       arv_device_set_float_feature_value(pDevice, feature_name.c_str(), max);
     }
     else if(valueD < min)
     {
-      ROS_WARN(("Boundary Warning: Try to set feature "+ feature_name
+      ROS_WARN("%s", ("Boundary Warning: Try to set feature "+ feature_name
                + "to " + std::to_string(valueD) + "but min value is " +
                std::to_string(max) + ". Therefore it is set to min value").c_str());
       arv_device_set_float_feature_value(pDevice, feature_name.c_str(), min);
@@ -199,7 +199,7 @@ public:
     }
     else
     {
-      ROS_WARN(("Enum Warning: Try to set enum feature "+ feature_name
+      ROS_WARN("%s", ("Enum Warning: Try to set enum feature "+ feature_name
                + " to " + value + " but this is not available. Do nothing").c_str());
     }
     return false;
@@ -347,13 +347,13 @@ void GenicamFeatures::write_features_from_rosparam(std::shared_ptr<ros::NodeHand
         }
         else
         {
-          ROS_WARN(("write_features_from_rosparam: try to set feature " + xmlrpcParam.first +
+          ROS_WARN("%s", ("write_features_from_rosparam: try to set feature " + xmlrpcParam.first +
                     " for camera " + serial_number + " but value has to be string (conversion is internally handled)").c_str());
         }
       }
       else
       {
-        ROS_WARN(("write_features_from_rosparam: can set value for command" +
+        ROS_WARN("%s", ("write_features_from_rosparam: can set value for command" +
                  xmlrpcParam.first + " ,because it is not " +
                  "supported by camera with serial number: " + serial_number).c_str());
       }

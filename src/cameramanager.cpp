@@ -1,8 +1,12 @@
 #include "camera_aravis/cameramanager.h"
 
+// -- Public methods
+
 CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
   phNodeHandle(nodeHandle)
 {
+  heartBeatPublisher = nodeHandle->advertise<xamla_sysmon_msgs::HeartBeat>("heartbeat", 1);
+
   cameras.reserve(16);
   initializeDevices(true);
 
@@ -32,77 +36,6 @@ gboolean CameraManager::update_callback(void *cameraManager)
   ((CameraManager*) cameraManager)->initializeDevices();
 
   return true;
-}
-
-
-void CameraManager::initializeDevices(bool is_first_time)
-{
-  uint64_t nDevices=0;
-  std::unordered_map<std::string, std::string> available_cameras;
-
-  // Print out some useful info.
-//  ROS_INFO("Update Device List:");
-  arv_update_device_list();
-  nDevices = arv_get_n_devices();
-//  ROS_INFO("# Number of found Devices: %d", nDevices);
-  for (int i = 0; i < nDevices; i++)
-  {
-    std::string device_ID = arv_get_device_id(i);
-    size_t position = device_ID.rfind('-');
-    if (position!=std::string::npos && device_ID.size()>(position+1))
-    {
-      available_cameras[device_ID.substr(position+1)] = device_ID;
-    } else
-    {
-      available_cameras[device_ID] = device_ID;
-    }
-
-  }
-
-  if(is_first_time == true)
-  {
-    if (phNodeHandle->hasParam(ros::this_node::getName() + "/camera_serials"))
-    {
-      phNodeHandle->getParam(ros::this_node::getName() + "/camera_serials",
-                              requested_cameras);
-    }
-  }
-
-  if (requested_cameras.size()==0)
-  {
-    for(auto &serial_deviceID : available_cameras)
-    {
-      requested_cameras.push_back(serial_deviceID.first);
-    }
-  }
-
-  for (const auto &serial_deviceID : available_cameras)
-  {
-    if(std::find(requested_cameras.begin(),
-                 requested_cameras.end(),
-                 serial_deviceID.first) != requested_cameras.end())
-    {
-      auto iter = cameras.find(serial_deviceID.first);
-      if( iter != cameras.end() && iter->second->getCameraState() == CameraState::NOTINITIALIZED)
-      {
-        ROS_INFO("Try to reconnect to camera: %s  with device id: %s",
-                 serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
-
-        iter->second->reestablishConnection(phNodeHandle);
-      }
-      else if(iter == cameras.end())
-      {
-        // Open the camera, and set it up.
-        ROS_INFO("Add requested camera: %s  with device id: %s",
-                 serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
-
-        cameras.emplace(std::piecewise_construct,
-                        std::forward_as_tuple(serial_deviceID.first),
-                        std::forward_as_tuple(std::make_shared<GeniCam>(phNodeHandle, serial_deviceID)));
-      }
-    }
-
-  }
 }
 
 bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
@@ -238,4 +171,117 @@ bool CameraManager::setIO_callback(camera_aravis::SetIORequest &request,
   }
   response.response="everthing works fine";
   return true;
+}
+
+void CameraManager::sendHeartBeat()
+{
+  heartBeatPublisher.publish(createHeartBeatMessage());
+}
+
+// -- protected methods
+
+void CameraManager::initializeDevices(bool is_first_time)
+{
+  uint64_t nDevices=0;
+  std::unordered_map<std::string, std::string> available_cameras;
+
+  // Print out some useful info.
+//  ROS_INFO("Update Device List:");
+  arv_update_device_list();
+  nDevices = arv_get_n_devices();
+  //ROS_INFO("# Number of found Devices: %d", nDevices);
+
+  for (int i = 0; i < nDevices; i++)
+  {
+    std::string device_ID = arv_get_device_id(i);
+    size_t position = device_ID.rfind('-');
+    if (position!=std::string::npos && device_ID.size()>(position+1))
+    {
+      available_cameras[device_ID.substr(position+1)] = device_ID;
+    } else
+    {
+      available_cameras[device_ID] = device_ID;
+    }
+
+  }
+
+  if(is_first_time == true)
+  {
+    if (phNodeHandle->hasParam(ros::this_node::getName() + "/camera_serials"))
+    {
+      phNodeHandle->getParam(ros::this_node::getName() + "/camera_serials",
+                              requested_cameras);
+    }
+  }
+
+  if (requested_cameras.size()==0)
+  {
+    for(auto &serial_deviceID : available_cameras)
+    {
+      requested_cameras.push_back(serial_deviceID.first);
+    }
+  }
+
+  for (const auto &serial_deviceID : available_cameras)
+  {
+    if(std::find(requested_cameras.begin(),
+                 requested_cameras.end(),
+                 serial_deviceID.first) != requested_cameras.end())
+    {
+      auto iter = cameras.find(serial_deviceID.first);
+      if( iter != cameras.end() && iter->second->getCameraState() == CameraState::NOTINITIALIZED)
+      {
+        ROS_INFO("Try to reconnect to camera: %s  with device id: %s",
+                 serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
+
+        iter->second->reestablishConnection(phNodeHandle);
+      }
+      else if(iter == cameras.end())
+      {
+        // Open the camera, and set it up.
+        ROS_INFO("Add requested camera: %s  with device id: %s",
+                 serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
+
+        cameras.emplace(std::piecewise_construct,
+                        std::forward_as_tuple(serial_deviceID.first),
+                        std::forward_as_tuple(std::make_shared<GeniCam>(phNodeHandle, serial_deviceID)));
+      }
+    }
+
+  }
+}
+
+
+xamla_sysmon_msgs::HeartBeat CameraManager::createHeartBeatMessage()
+{
+  bool isGO = true;
+  xamla_sysmon_msgs::HeartBeat msg;
+
+  if(requested_cameras.size() != cameras.size())
+  {
+    isGO = false;
+  }
+
+  for(auto &camera : cameras)
+  {
+    if(camera.second->getCameraState() == CameraState::NOTINITIALIZED)
+    {
+      isGO = false;
+      break;
+    }
+  }
+
+  if(isGO == true)
+  {
+    msg.status = static_cast<int>(TopicHeartbeatStatus::TopicCode::GO);
+  }
+  else
+  {
+    msg.status = static_cast<int>(TopicHeartbeatStatus::TopicCode::INTERNAL_ERROR);
+  }
+
+  msg.details = TopicHeartbeatStatus::generateMessageText(TopicHeartbeatStatus::intToStatusCode(msg.status));
+  msg.header.stamp = ros::Time::now();
+
+  return msg;
 }

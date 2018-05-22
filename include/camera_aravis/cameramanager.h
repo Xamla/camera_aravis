@@ -6,6 +6,9 @@
 #include <camera_aravis/SendCommand.h>
 #include <camera_aravis/SetIO.h>
 
+#include "xamla_sysmon_msgs/HeartBeat.h"
+#include "xamla_sysmon_msgs/statuscodes.h"
+
 #include "camera_aravis/genicam.h"
 
 class CameraManager
@@ -28,10 +31,13 @@ public:
   bool setIO_callback(camera_aravis::SetIORequest& request,
                       camera_aravis::SetIOResponse& response);
 
+  void sendHeartBeat();
+
 protected:
   //search for new devices and initialize
   //them when device is requested
   void initializeDevices(bool is_first_time=false);
+  xamla_sysmon_msgs::HeartBeat createHeartBeatMessage();
 
   //attributes
   std::shared_ptr<ros::NodeHandle> phNodeHandle;
@@ -44,6 +50,8 @@ protected:
   ros::ServiceServer getConnectedDevicesServiceServer;
   ros::ServiceServer sendCommandServiceServer;
   ros::ServiceServer setIOServiceServer;
+
+  ros::Publisher heartBeatPublisher;
 };
 
 #endif // CAMERAMANAGER_H
