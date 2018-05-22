@@ -92,9 +92,18 @@ if __name__ == "__main__":
 
   saveIAJ = SaveImageAndJointState(path, serials)
 
-  print('start capture process') 
-  saveIAJ.capture()
-  print('ready for next')
+  print ('press q to exit')
+  print ('press everthing else to capture')
+
+  while True:
+    k = cv2.waitKey(1) & 0xFF
+    
+    if k == ord('q'):
+      break
+    else:
+      print('start capture process') 
+      saveIAJ.capture()
+      print('ready for next')
 
   #def callback(event):
   #  print('start capture process') 
