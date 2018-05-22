@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-
+import thread
+import signal
 import sys
 import copy
 import rospy
@@ -55,6 +56,7 @@ class CaptureClient:
 
     except rospy.ServiceException, e:
       print "Service call failed: %s"%e
+      raise Exception('capture failed!')
 
 class SaveImageAndJointState:
 
@@ -69,41 +71,64 @@ class SaveImageAndJointState:
 
   def capture(self): 
     
-    captureResult = self.captureClient.call_capture_service(self.serials)
-    robot_state = self.robot.get_current_state()
+    try:
+      captureResult = self.captureClient.call_capture_service(self.serials)
+      robot_state = self.robot.get_current_state()
 
-    data = {}
-    data['name'] = robot_state.joint_state.name
-    data['position'] = robot_state.joint_state.position
+      data = {}
+      data['name'] = robot_state.joint_state.name
+      data['position'] = robot_state.joint_state.position
 
-    now = datetime.datetime.now()
-    filenameCommonPart = now.strftime("%Y-%m-%d_%H:%M:%S")
+      now = datetime.datetime.now()
+      filenameCommonPart = now.strftime("%Y-%m-%d_%H:%M:%S")
 
-    for i, serial in enumerate(captureResult):
-      self.fileManager.writeImage(filenameCommonPart+'_camera_'+serial, captureResult[serial])
-    self.fileManager.writeJsonFile(filenameCommonPart+'_joint_state',data)
-    
+      for i, serial in enumerate(captureResult):
+        self.fileManager.writeImage(filenameCommonPart+'_camera_'+serial, captureResult[serial])
+      self.fileManager.writeJsonFile(filenameCommonPart+'_joint_state',data)
+    except Exception, e:
+      print e
 
+
+terminate = False                            
+
+def signal_handling(signum,frame):           
+    global terminate                         
+    terminate = True     
 
 if __name__ == "__main__":
   path = '/home/volk/Desktop/recording'
-  #serials = ['4103217455']
-  serials = ['4103235743','4103217455']
+  serials = ['4103217455']
+  #serials = ['4103235743','4103217455']
 
   saveIAJ = SaveImageAndJointState(path, serials)
 
-  print ('press q to exit')
-  print ('press everthing else to capture')
+  print ('press strg-C to exit')
+  print ('press enter to capture')
+
+  a_list = []
+
+  def input_thread(a_list):
+    while True:
+      if terminate == True:
+        break
+      raw_input()
+      a_list.append(True)
+      print (a_list)
+
+  signal.signal(signal.SIGINT,signal_handling) 
+
+  thread.start_new_thread(input_thread, (a_list,))
+    
 
   while True:
-    k = cv2.waitKey(1) & 0xFF
-    
-    if k == ord('q'):
+    if terminate == True:
       break
-    else:
+    if a_list:
+      a_list.remove(True)
       print('start capture process') 
       saveIAJ.capture()
       print('ready for next')
+      
 
   #def callback(event):
   #  print('start capture process') 

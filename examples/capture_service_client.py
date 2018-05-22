@@ -14,8 +14,8 @@ def call_getconnecteddevices_service():
   try:
     getSerials = rospy.ServiceProxy('camera_aravis_node/getconnecteddevices', GetConnectedDevices)
     resp = getSerials()
-    temp = ['12']
-    return temp#resp.serials
+    #temp = ['12']
+    return resp.serials
 
   except rospy.ServiceException, e:
     print "Service call failed: %s"%e

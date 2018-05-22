@@ -182,10 +182,10 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
   bool changedTriggerProperties = false;
   try
   {
-    if(genicamFeatures.is_implemented("TriggerMode") ||
-       genicamFeatures.is_implemented("TriggerSource") ||
-       genicamFeatures.is_implemented("AcquisitionMode") ||
-       genicamFeatures.is_implemented("ExposureTime"))
+    if(!genicamFeatures.is_implemented("TriggerMode") ||
+       !genicamFeatures.is_implemented("TriggerSource") ||
+       !genicamFeatures.is_implemented("AcquisitionMode") ||
+       !genicamFeatures.is_implemented("ExposureTime"))
     {
       throw std::runtime_error("Capture: can not be used because "
                          "software and hardware triggering is not "
