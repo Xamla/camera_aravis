@@ -17,6 +17,16 @@ from cv_bridge import CvBridge, CvBridgeError
 from camera_aravis.srv import *
 #import Tkinter as tk
 
+def call_getconnecteddevices_service():
+  rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
+  try:
+    getSerials = rospy.ServiceProxy('camera_aravis_node/getconnecteddevices', GetConnectedDevices)
+    resp = getSerials()
+    return resp.serials
+
+  except rospy.ServiceException, e:
+    print "Service call failed: %s"%e
+
 class FileManager:
   def __init__(self, path):
     self.path =  path + '/'
@@ -89,13 +99,27 @@ class SaveImageAndJointState:
       print e
 
 
-terminate = False                            
+terminate = False
+nextCommand = True                           
 
 def signal_handling(signum,frame):           
     global terminate                         
-    terminate = True     
+    terminate = True
 
-if __name__ == "__main__":
+def input_thread():
+  global nextCommand
+  while True:
+    if terminate == True:
+      break
+    if nextCommand:
+      raw_input('Please enter to start the next capture')
+           
+
+def main():
+  global nextCommand
+
+  serials = call_getconnecteddevices_service()
+
   path = '/home/volk/Desktop/recording'
   serials = ['4103217455']
   #serials = ['4103235743','4103217455']
@@ -103,44 +127,19 @@ if __name__ == "__main__":
   saveIAJ = SaveImageAndJointState(path, serials)
 
   print ('press strg-C to exit')
-  print ('press enter to capture')
-
-  a_list = []
-
-  def input_thread(a_list):
-    while True:
-      if terminate == True:
-        break
-      raw_input()
-      a_list.append(True)
-      print (a_list)
 
   signal.signal(signal.SIGINT,signal_handling) 
 
-  thread.start_new_thread(input_thread, (a_list,))
-    
+  thread.start_new_thread(input_thread, ())
 
   while True:
     if terminate == True:
       break
-    if a_list:
-      a_list.remove(True)
+    if not nextCommand:
       print('start capture process') 
       saveIAJ.capture()
       print('ready for next')
-      
+      nextCommand = True
 
-  #def callback(event):
-  #  print('start capture process') 
-  #  saveIAJ.capture()
-  #  print('ready for next')
-
-  #root = tk.Tk()
-  #canvas= tk.Canvas(root, width=100, height=100)
-  #canvas.create_text(50,50,fill="black",font="Times 10 italic bold",
-  #                      text="Click to capture")
-  #canvas.bind("<Button-1>", callback)
-  #canvas.pack()
-  #root.mainloop()
-
-
+if __name__ == "__main__":
+  main()
