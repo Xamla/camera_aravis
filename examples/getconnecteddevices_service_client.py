@@ -6,23 +6,26 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from camera_aravis.srv import *
 
+
 def call_getconnecteddevices_service():
-  rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
-  try:
-    getSerials = rospy.ServiceProxy('camera_aravis_node/getconnecteddevices', GetConnectedDevices)
-    resp = getSerials()
-    
-    print('Number of connected cameras: ' + str(len(resp.serials)))
+    rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
+    try:
+        getSerials = rospy.ServiceProxy(
+            'camera_aravis_node/getconnecteddevices', GetConnectedDevices)
+        resp = getSerials()
 
-    for serial in resp.serials:
-      print('Camera serial number: ' + str(serial))
+        print('Number of connected cameras: ' + str(len(resp.serials)))
 
-  except rospy.ServiceException, e:
-    print "Service call failed: %s"%e
+        for serial in resp.serials:
+            print('Camera serial number: ' + str(serial))
+
+    except rospy.ServiceException, e:
+        print "Service call failed: %s" % e
+
 
 def main():
-  call_getconnecteddevices_service()
+    call_getconnecteddevices_service()
+
 
 if __name__ == "__main__":
-  main()
-  
+    main()
