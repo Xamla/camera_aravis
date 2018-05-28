@@ -186,7 +186,7 @@ void CameraManager::initializeDevices(bool is_first_time)
   std::unordered_map<std::string, std::string> available_cameras;
 
   // Print out some useful info.
-//  ROS_INFO("Update Device List:");
+  //ROS_INFO("Update Device List:");
   arv_update_device_list();
   nDevices = arv_get_n_devices();
   //ROS_INFO("# Number of found Devices: %d", nDevices);
@@ -194,6 +194,8 @@ void CameraManager::initializeDevices(bool is_first_time)
   for (int i = 0; i < nDevices; i++)
   {
     std::string device_ID = arv_get_device_id(i);
+    ROS_INFO("#Device: %s", device_ID.c_str());
+
     size_t position = device_ID.rfind('-');
     if (position!=std::string::npos && device_ID.size()>(position+1))
     {

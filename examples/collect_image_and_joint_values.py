@@ -124,6 +124,7 @@ def input_thread():
             break
         if nextCommand:
             raw_input('Please enter to start the next capture')
+            nextCommand = False
 
 
 def main():

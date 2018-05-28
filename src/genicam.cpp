@@ -205,22 +205,26 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
       arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
       arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-      std::chrono::microseconds exposure_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+      std::chrono::microseconds wait_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+      // set wait_time to a min because the image transport via ethernet is not infinity fast
+      if(wait_time < std::chrono::microseconds(17000))
+      {
+        wait_time = std::chrono::microseconds(17000);
+      }
 
       arv_device_execute_command(pDevice,
                                "AcquisitionStart");
 
-      arv_device_execute_command(pDevice, "TriggerSoftware");
-
       std::unique_lock<std::mutex> lck(imageWaitMutex);
-      if(newImageAvailable.wait_for(lck, exposure_time*3)==std::cv_status::no_timeout)
+      arv_device_execute_command(pDevice, "TriggerSoftware");
+      if(newImageAvailable.wait_for(lck, wait_time*3)==std::cv_status::no_timeout)
       {
         imageContainer.push_back(imageMsg);
       }
       else
       {
         throw std::runtime_error("Capture: after 3 times the "
-                                 "exposure time a new image was still "
+                                 "exposure time or min 50ms a new image was still "
                                  "not available abort; serial: " + serialNumber);
       }
       restoreAquistionsMode(wasStreaming);
@@ -355,6 +359,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
   {
     if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS)
     {
+      std::unique_lock<std::mutex> lck(imageWaitMutex);
       nBuffers++;
       size_t pSize = 0;
       const void* pData = arv_buffer_get_data(pBuffer, &pSize);
@@ -406,6 +411,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       camerainfo.header.frame_id = imageMsg.header.frame_id;
       camerainfo.width = widthRoi;
       camerainfo.height = heightRoi;
+      lck.unlock();
       newImageAvailable.notify_all();
 
       publisher.publish(imageMsg, camerainfo);
