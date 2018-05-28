@@ -24,8 +24,6 @@
 // rosparam set camnode/GainAuto 1
 //
 
-#include <arvbuffer.h>
-
 #include <iostream>
 #include <memory>
 #include <string>

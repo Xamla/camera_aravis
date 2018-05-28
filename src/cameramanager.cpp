@@ -194,7 +194,7 @@ void CameraManager::initializeDevices(bool is_first_time)
   for (int i = 0; i < nDevices; i++)
   {
     std::string device_ID = arv_get_device_id(i);
-    ROS_INFO("#Device: %s", device_ID.c_str());
+    //ROS_INFO("#Device: %s", device_ID.c_str());
 
     size_t position = device_ID.rfind('-');
     if (position!=std::string::npos && device_ID.size()>(position+1))
@@ -233,7 +233,7 @@ void CameraManager::initializeDevices(bool is_first_time)
       auto iter = cameras.find(serial_deviceID.first);
       if( iter != cameras.end() && iter->second->getCameraState() == CameraState::NOTINITIALIZED)
       {
-        ROS_INFO("Try to reconnect to camera: %s  with device id: %s",
+        ROS_INFO("Reconnect to camera: %s  with device id: %s",
                  serial_deviceID.first.c_str(), serial_deviceID.second.c_str());
 
         iter->second->reestablishConnection(phNodeHandle);
