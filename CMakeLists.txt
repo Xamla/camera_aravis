@@ -15,8 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
 
-catkin_python_setup()
-
 add_service_files(
   DIRECTORY
     srv
@@ -48,3 +46,25 @@ add_executable(${PROJECT_NAME}_node
 
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${Aravis_LIBRARIES} glib-2.0 gmodule-2.0 gobject-2.0)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
+
+install(TARGETS ${PROJECT_NAME}_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS scripts/service_call_examples/capture_service_client
+  scripts/service_call_examples/collect_image_and_joint_values
+  scripts/service_call_examples/getconnecteddevices_service_client
+  scripts/service_call_examples/sendCommand_service_client
+  scripts/service_call_examples/setIO_service_client
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  PATTERN ".svn" EXCLUDE
+)
+
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+  PATTERN ".svn" EXCLUDE)
