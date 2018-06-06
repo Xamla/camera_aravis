@@ -1,6 +1,8 @@
 #ifndef CAMERAMANAGER_H
 #define CAMERAMANAGER_H
 
+#include <thread>
+
 #include <camera_aravis/Capture.h>
 #include <camera_aravis/GetConnectedDevices.h>
 #include <camera_aravis/SendCommand.h>
@@ -17,7 +19,9 @@ public:
   CameraManager() = delete;
   CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle);
 
-  static gboolean update_callback(void* cameraManager);
+  ~CameraManager();
+
+  bool runUpdate();
 
   bool capture_callback(camera_aravis::CaptureRequest& request,
                         camera_aravis::CaptureResponse& response);
@@ -41,6 +45,10 @@ protected:
 
   //attributes
   std::shared_ptr<ros::NodeHandle> phNodeHandle;
+  std::unique_ptr<std::thread> pUpdateThread;
+  std::atomic<bool> runUpdateThread;
+  std::mutex updateMutex;
+  std::condition_variable  killUpdateThread;
 
   std::vector<std::string> requested_cameras;
 

@@ -3,7 +3,7 @@
 // -- Public methods
 
 CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
-  phNodeHandle(nodeHandle)
+  phNodeHandle(nodeHandle), runUpdateThread(true), pUpdateThread(new std::thread(&CameraManager::runUpdate, this))
 {
   heartBeatPublisher = nodeHandle->advertise<xamla_sysmon_msgs::HeartBeat>("heartbeat", 1);
 
@@ -31,10 +31,26 @@ CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
       ("setio", std::bind(&CameraManager::setIO_callback, this, std::placeholders::_1, std::placeholders::_2));
 }
 
-gboolean CameraManager::update_callback(void *cameraManager)
+CameraManager::~CameraManager()
 {
-  ((CameraManager*) cameraManager)->initializeDevices();
+  runUpdateThread.store(false);
+  killUpdateThread.notify_all();
+  pUpdateThread->join();
+}
 
+bool CameraManager::runUpdate()
+{
+  auto waitTime = std::chrono::seconds(10);
+
+  while(runUpdateThread.load() == true)
+  {
+    std::unique_lock<std::mutex> lck(updateMutex);
+    if(killUpdateThread.wait_for(lck, waitTime) == std::cv_status::timeout)
+    {
+      ROS_INFO("Update devices list");
+      initializeDevices();
+    }
+  }
   return true;
 }
 

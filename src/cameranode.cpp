@@ -87,7 +87,6 @@ int main(int argc, char** argv)
 
   CameraManager cameraManager(phNode);
 
-  g_timeout_add_seconds(10, CameraManager::update_callback, &cameraManager);
   g_timeout_add(200, PeriodicTask_callback, &cameraManager);
 
   void (*pSigintHandlerOld)(int);
@@ -99,7 +98,7 @@ int main(int argc, char** argv)
 
   signal(SIGINT, pSigintHandlerOld);
 
-  g_main_loop_unref(global.main_loop);
+  g_main_destroy(global.main_loop);
 
   ros::shutdown();
   arv_shutdown();
