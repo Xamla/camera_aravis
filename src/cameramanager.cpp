@@ -1,4 +1,6 @@
 #include "camera_aravis/cameramanager.h"
+#include <algorithm>
+#include <ctype.h>
 
 // -- Public methods
 
@@ -229,6 +231,21 @@ void CameraManager::initializeDevices(bool is_first_time)
     {
       phNodeHandle->getParam(ros::this_node::getName() + "/camera_serials",
                               requested_cameras);
+
+      if(requested_cameras.size() == 1 &&
+         std::all_of(requested_cameras[0].begin(), requested_cameras[0].end(), [](char c){ return isspace(c);}))
+      {
+        requested_cameras.clear();
+      }
+
+      for(auto& item : requested_cameras)
+      {
+        size_t position = item.rfind('-');
+        if (position!=std::string::npos && item.size()>(position+1))
+        {
+          item = item.substr(position+1);
+        }
+      }
     }
   }
 
