@@ -359,7 +359,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
   {
     if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS)
     {
-      std::unique_lock<std::mutex> lck(imageWaitMutex);
+
       nBuffers++;
       size_t pSize = 0;
       const void* pData = arv_buffer_get_data(pBuffer, &pSize);
@@ -394,6 +394,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       tm = tn;
       em = en;
 
+      std::unique_lock<std::mutex> lck(imageWaitMutex);
       // Construct the image message.
       imageMsg.header.stamp.fromNSec(tn);
       imageMsg.header.seq = sequenceCounter;

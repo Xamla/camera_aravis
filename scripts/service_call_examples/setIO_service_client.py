@@ -15,8 +15,8 @@ def call_getconnecteddevices_service():
         resp = getSerials()
         return resp.serials
 
-    except rospy.ServiceException, e:
-        print "Service call failed: %s" % e
+    except rospy.ServiceException as e:
+        print ("Service call failed: " + e)
 
 
 def call_setIO_service(serials, port, value):
@@ -27,8 +27,8 @@ def call_setIO_service(serials, port, value):
 
         print(resp.response)
 
-    except rospy.ServiceException, e:
-        print "Service call failed: %s" % e
+    except rospy.ServiceException as e:
+        print ("Service call failed: " + e)
 
 
 def main():

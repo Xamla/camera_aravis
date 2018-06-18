@@ -19,8 +19,8 @@ def call_getconnecteddevices_service():
         #temp = ['12']
         return resp.serials
 
-    except rospy.ServiceException, e:
-        print "Service call failed: %s" % e
+    except rospy.ServiceException as e:
+        print ("Service call failed: " + e)
 
 
 class capture_client:
@@ -43,8 +43,8 @@ class capture_client:
                 cv2.imshow(serial, cv_image)
                 cv2.waitKey(1000)
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s" % e
+        except rospy.ServiceException as e:
+            print ("Service call failed: " + e)
 
 
 def main():

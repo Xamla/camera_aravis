@@ -26,8 +26,8 @@ def call_getconnecteddevices_service():
         resp = getSerials()
         return resp.serials
 
-    except rospy.ServiceException, e:
-        print "Service call failed: %s" % e
+    except rospy.ServiceException as e:
+        print ("Service call failed: " + e)
 
 
 class FileManager:
@@ -69,8 +69,8 @@ class CaptureClient:
 
             return data
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s" % e
+        except rospy.ServiceException as e:
+            print ("Service call failed: " + e)
             raise Exception('capture failed!')
 
 
@@ -104,7 +104,7 @@ class SaveImageAndJointState:
                     filenameCommonPart+'_camera_'+serial, captureResult[serial])
             self.fileManager.writeJsonFile(
                 filenameCommonPart+'_joint_state', data)
-        except Exception, e:
+        except Exception as e:
             print e
 
 

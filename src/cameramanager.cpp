@@ -49,7 +49,7 @@ bool CameraManager::runUpdate()
     std::unique_lock<std::mutex> lck(updateMutex);
     if(killUpdateThread.wait_for(lck, waitTime) == std::cv_status::timeout)
     {
-      ROS_INFO("Update devices list");
+      ROS_INFO("Update device list");
       initializeDevices();
     }
   }
