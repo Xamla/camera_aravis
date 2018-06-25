@@ -70,6 +70,8 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
       throw std::runtime_error(("camera with ID: "+ serialNumber +" could not be opened. skip."));
     }
 
+    arv_camera_gv_auto_packet_size(pCamera);
+
     pDevice = arv_camera_get_device(pCamera);
 
     ROS_INFO("Opened: %s-%s", arv_device_get_string_feature_value(
@@ -202,7 +204,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
                                  "AcquisitionStop");
       }
 
-      arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
+      //arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
       arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
       arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
       std::chrono::microseconds wait_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
@@ -217,13 +219,13 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 
       std::unique_lock<std::mutex> lck(imageWaitMutex);
       arv_device_execute_command(pDevice, "TriggerSoftware");
-      if(newImageAvailable.wait_for(lck, wait_time*3)==std::cv_status::no_timeout)
+      if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
       {
         imageContainer.push_back(imageMsg);
       }
       else
       {
-        throw std::runtime_error("Capture: after 3 times the "
+        throw std::runtime_error("Capture: after 5 times the "
                                  "exposure time or min 50ms a new image was still "
                                  "not available abort; serial: " + serialNumber);
       }
@@ -294,10 +296,10 @@ bool GeniCam::tryToGetFeatureValue(const std::string &feature, std::string &valu
 
 ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
-  gboolean bAutoBuffer = FALSE;
+  gboolean bAutoBuffer = TRUE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 40; // milliseconds
-  unsigned int timeoutFrameRetention = 200;
+  unsigned int timeoutPacket = 1000; // milliseconds
+  unsigned int timeoutFrameRetention = 1200;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
@@ -476,7 +478,7 @@ void GeniCam::disconnectCallback()
 void GeniCam::restoreAquistionsMode(const bool &wasStreaming)
 {
   arv_device_execute_command(pDevice, "AcquisitionStop");
-  arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "Continuous");
+  //arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "Continuous");
   arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
 
   if(wasStreaming)

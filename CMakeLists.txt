@@ -53,11 +53,11 @@ install(TARGETS ${PROJECT_NAME}_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-catkin_install_python(PROGRAMS scripts/service_call_examples/capture_service_client
-  scripts/service_call_examples/collect_image_and_joint_values
-  scripts/service_call_examples/getconnecteddevices_service_client
-  scripts/service_call_examples/sendCommand_service_client
-  scripts/service_call_examples/setIO_service_client
+catkin_install_python(PROGRAMS scripts/service_call_examples/capture_service_client.py
+  scripts/service_call_examples/collect_image_and_joint_values.py
+  scripts/service_call_examples/getconnecteddevices_service_client.py
+  scripts/service_call_examples/sendCommand_service_client.py
+  scripts/service_call_examples/setIO_service_client.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY include/${PROJECT_NAME}/
