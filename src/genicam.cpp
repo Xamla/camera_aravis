@@ -70,7 +70,7 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
       throw std::runtime_error(("camera with ID: "+ serialNumber +" could not be opened. skip."));
     }
 
-    arv_camera_gv_auto_packet_size(pCamera);
+    //arv_camera_gv_auto_packet_size(pCamera);
 
     pDevice = arv_camera_get_device(pCamera);
 
@@ -296,7 +296,7 @@ bool GeniCam::tryToGetFeatureValue(const std::string &feature, std::string &valu
 
 ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
-  gboolean bAutoBuffer = TRUE;
+  gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
   unsigned int timeoutPacket = 3000; // milliseconds
   unsigned int timeoutFrameRetention = 3200;
