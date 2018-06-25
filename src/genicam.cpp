@@ -219,13 +219,13 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 
       std::unique_lock<std::mutex> lck(imageWaitMutex);
       arv_device_execute_command(pDevice, "TriggerSoftware");
-      if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
+      if(newImageAvailable.wait_for(lck, wait_time*10)==std::cv_status::no_timeout)
       {
         imageContainer.push_back(imageMsg);
       }
       else
       {
-        throw std::runtime_error("Capture: after 5 times the "
+        throw std::runtime_error("Capture: after 10 times the "
                                  "exposure time or min 50ms a new image was still "
                                  "not available abort; serial: " + serialNumber);
       }
@@ -298,8 +298,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = TRUE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 1000; // milliseconds
-  unsigned int timeoutFrameRetention = 1200;
+  unsigned int timeoutPacket = 3000; // milliseconds
+  unsigned int timeoutFrameRetention = 3200;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
@@ -313,7 +313,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 
     if (bAutoBuffer)
       g_object_set(pStream, "socket-buffer", ARV_GV_STREAM_SOCKET_BUFFER_AUTO,
-                   "socket-buffer-size", 0, NULL);
+                   "socket-buffer-size", 1000000, NULL);
     if (!bPacketResend)
       g_object_set(pStream, "packet-resend",
                    bPacketResend ? ARV_GV_STREAM_PACKET_RESEND_ALWAYS
