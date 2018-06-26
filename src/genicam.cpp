@@ -208,13 +208,13 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       //arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
       arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
       arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-//      std::chrono::microseconds wait_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+//      (int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
 //      // set wait_time to a min because the image transport via ethernet is not infinity fast
 //      if(wait_time < std::chrono::microseconds(20000))
 //      {
 //        wait_time = std::chrono::microseconds(20000);
 //      }
-      std::chrono::microseconds wait_time = std::chrono::microseconds(20000);
+      std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
 
       arv_device_execute_command(pDevice,
                                "AcquisitionStart");
@@ -227,7 +227,6 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
         arv_device_execute_command(pDevice, "TriggerSoftware");
         if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
         {
-          std::cout<<i<<std::endl;
           imageContainer.push_back(imageMsg);
           break;
         }
@@ -237,6 +236,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
                                    "exposure time or min 100ms and 3 tries an new image was still "
                                    "not available abort; serial: " + serialNumber);
         }
+        std::cout<<i<<std::endl;
       }
 
       restoreAquistionsMode(wasStreaming);
@@ -308,8 +308,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 3000; // milliseconds
-  unsigned int timeoutFrameRetention = 4200;
+  unsigned int timeoutPacket = 5000; // milliseconds
+  unsigned int timeoutFrameRetention = 5200;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
