@@ -18,8 +18,9 @@ const char* szBufferStatusFromInt[] = {
 static void stream_cb (void *user_data, ArvStreamCallbackType type, ArvBuffer *buffer)
 {
   if (type == ARV_STREAM_CALLBACK_TYPE_INIT) {
-    if (!arv_make_thread_realtime (10) &&
-        !arv_make_thread_high_priority (-10))
+    if (!arv_make_thread_realtime (10))
+      g_warning ("Failed to make stream thread real time");
+    if(!arv_make_thread_high_priority (-10))
       g_warning ("Failed to make stream thread high priority");
   }
 }
@@ -70,7 +71,7 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
       throw std::runtime_error(("camera with ID: "+ serialNumber +" could not be opened. skip."));
     }
 
-    //arv_camera_gv_auto_packet_size(pCamera);
+    arv_camera_gv_auto_packet_size(pCamera);
 
     pDevice = arv_camera_get_device(pCamera);
 
@@ -207,28 +208,37 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       //arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "SingleFrame");
       arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
       arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-      std::chrono::microseconds wait_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
-      // set wait_time to a min because the image transport via ethernet is not infinity fast
-      if(wait_time < std::chrono::microseconds(17000))
-      {
-        wait_time = std::chrono::microseconds(17000);
-      }
+//      std::chrono::microseconds wait_time(int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+//      // set wait_time to a min because the image transport via ethernet is not infinity fast
+//      if(wait_time < std::chrono::microseconds(20000))
+//      {
+//        wait_time = std::chrono::microseconds(20000);
+//      }
+      std::chrono::microseconds wait_time = std::chrono::microseconds(20000);
 
       arv_device_execute_command(pDevice,
                                "AcquisitionStart");
 
-      std::unique_lock<std::mutex> lck(imageWaitMutex);
-      arv_device_execute_command(pDevice, "TriggerSoftware");
-      if(newImageAvailable.wait_for(lck, wait_time*10)==std::cv_status::no_timeout)
+      size_t tries = 3;
+      for(size_t i = 0; i<tries; i++)
       {
-        imageContainer.push_back(imageMsg);
+        std::cout<<"start trigger "<< std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
+        std::unique_lock<std::mutex> lck(imageWaitMutex);
+        arv_device_execute_command(pDevice, "TriggerSoftware");
+        if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
+        {
+          std::cout<<i<<std::endl;
+          imageContainer.push_back(imageMsg);
+          break;
+        }
+        else if(i==tries-1)
+        {
+          throw std::runtime_error("Capture: after 5 times the "
+                                   "exposure time or min 100ms and 3 tries an new image was still "
+                                   "not available abort; serial: " + serialNumber);
+        }
       }
-      else
-      {
-        throw std::runtime_error("Capture: after 10 times the "
-                                 "exposure time or min 50ms a new image was still "
-                                 "not available abort; serial: " + serialNumber);
-      }
+
       restoreAquistionsMode(wasStreaming);
     }
     else
@@ -299,7 +309,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
   unsigned int timeoutPacket = 3000; // milliseconds
-  unsigned int timeoutFrameRetention = 3200;
+  unsigned int timeoutFrameRetention = 4200;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
@@ -414,6 +424,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       camerainfo.header.frame_id = imageMsg.header.frame_id;
       camerainfo.width = widthRoi;
       camerainfo.height = heightRoi;
+      std::cout << "Notify " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
       lck.unlock();
       newImageAvailable.notify_all();
 
