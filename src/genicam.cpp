@@ -20,8 +20,8 @@ static void stream_cb (void *user_data, ArvStreamCallbackType type, ArvBuffer *b
   if (type == ARV_STREAM_CALLBACK_TYPE_INIT) {
     if (!arv_make_thread_realtime (10))
       g_warning ("Failed to make stream thread real time");
-    if(!arv_make_thread_high_priority (-10))
-      g_warning ("Failed to make stream thread high priority");
+    //if(!arv_make_thread_high_priority (-10))
+    g_warning ("Failed to make stream thread high priority");
   }
 }
 
@@ -227,6 +227,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
         arv_device_execute_command(pDevice, "TriggerSoftware");
         if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
         {
+          std::cout<<i<<std::endl;
           imageContainer.push_back(imageMsg);
           break;
         }
@@ -308,8 +309,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 5000; // milliseconds
-  unsigned int timeoutFrameRetention = 5200;
+  unsigned int timeoutPacket = 2000; // milliseconds
+  unsigned int timeoutFrameRetention = 3000;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
