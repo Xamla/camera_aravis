@@ -61,14 +61,12 @@ static void set_cancel(int signal) { global.bCancel = TRUE; }
 static gboolean PeriodicTask_callback(void* cameraManager)
 {
   CameraManager *pCameraManager = (CameraManager*) cameraManager;
-
   if (global.bCancel || ros::isShuttingDown())
   {
     g_main_loop_quit(global.main_loop);
     return FALSE;
   }
 
-  pCameraManager->sendHeartBeat();
   ros::spinOnce();
 
   return TRUE;
@@ -87,7 +85,7 @@ int main(int argc, char** argv)
 
   CameraManager cameraManager(phNode);
 
-  g_timeout_add(200, PeriodicTask_callback, &cameraManager);
+  g_timeout_add(20, PeriodicTask_callback, &cameraManager);
 
   void (*pSigintHandlerOld)(int);
   pSigintHandlerOld = signal(SIGINT, set_cancel);

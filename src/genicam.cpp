@@ -154,7 +154,7 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
 
 CameraState GeniCam::getCameraState()
 {
-  return cameraState;
+  return cameraState.load();
 }
 
 void GeniCam::showStatistic()

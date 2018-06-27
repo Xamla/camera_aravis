@@ -29,6 +29,7 @@ generate_messages(
    DEPENDENCIES
    std_msgs
    sensor_msgs
+   xamla_sysmon_msgs
 )
 
 catkin_package(

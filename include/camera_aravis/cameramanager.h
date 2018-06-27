@@ -35,13 +35,13 @@ public:
   bool setIO_callback(camera_aravis::SetIORequest& request,
                       camera_aravis::SetIOResponse& response);
 
-  void sendHeartBeat();
+  bool runHeartbeat();
 
 protected:
   //search for new devices and initialize
   //them when device is requested
   void initializeDevices(bool is_first_time=false);
-  xamla_sysmon_msgs::HeartBeat createHeartBeatMessage();
+  xamla_sysmon_msgs::HeartBeat createHeartbeatMessage();
 
   //attributes
   std::shared_ptr<ros::NodeHandle> phNodeHandle;
@@ -49,6 +49,11 @@ protected:
   std::atomic<bool> runUpdateThread;
   std::mutex updateMutex;
   std::condition_variable  killUpdateThread;
+
+  std::unique_ptr<std::thread> pHeartbeatThread;
+  std::atomic<bool> runHeartbeatThread;
+  std::mutex heartbeatMutex;
+  std::condition_variable killHeartbeatThread;
 
   std::vector<std::string> requested_cameras;
 

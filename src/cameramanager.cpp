@@ -5,7 +5,7 @@
 // -- Public methods
 
 CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
-  phNodeHandle(nodeHandle), runUpdateThread(true), pUpdateThread(new std::thread(&CameraManager::runUpdate, this))
+  phNodeHandle(nodeHandle), runUpdateThread(true), runHeartbeatThread(true), pUpdateThread(new std::thread(&CameraManager::runUpdate, this))
 {
   heartBeatPublisher = nodeHandle->advertise<xamla_sysmon_msgs::HeartBeat>("heartbeat", 1);
 
@@ -31,6 +31,8 @@ CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
       phNodeHandle->advertiseService<camera_aravis::SetIORequest,
                                       camera_aravis::SetIOResponse>
       ("setio", std::bind(&CameraManager::setIO_callback, this, std::placeholders::_1, std::placeholders::_2));
+
+  pHeartbeatThread.reset(new std::thread(&CameraManager::runHeartbeat, this));
 }
 
 CameraManager::~CameraManager()
@@ -38,6 +40,10 @@ CameraManager::~CameraManager()
   runUpdateThread.store(false);
   killUpdateThread.notify_all();
   pUpdateThread->join();
+
+  runHeartbeatThread.store(false);
+  killHeartbeatThread.notify_all();
+  pHeartbeatThread->join();
 }
 
 bool CameraManager::runUpdate()
@@ -191,9 +197,19 @@ bool CameraManager::setIO_callback(camera_aravis::SetIORequest &request,
   return true;
 }
 
-void CameraManager::sendHeartBeat()
+bool CameraManager::runHeartbeat()
 {
-  heartBeatPublisher.publish(createHeartBeatMessage());
+  auto waitTime = std::chrono::milliseconds(200);
+
+  while(runHeartbeatThread.load() == true)
+  {
+    std::unique_lock<std::mutex> lck(heartbeatMutex);
+    if(killHeartbeatThread.wait_for(lck, waitTime) == std::cv_status::timeout)
+    {
+      heartBeatPublisher.publish(createHeartbeatMessage());
+    }
+  }
+  return true;
 }
 
 // -- protected methods
@@ -287,7 +303,7 @@ void CameraManager::initializeDevices(bool is_first_time)
 }
 
 
-xamla_sysmon_msgs::HeartBeat CameraManager::createHeartBeatMessage()
+xamla_sysmon_msgs::HeartBeat CameraManager::createHeartbeatMessage()
 {
   bool isGO = true;
   xamla_sysmon_msgs::HeartBeat msg;
@@ -301,6 +317,7 @@ xamla_sysmon_msgs::HeartBeat CameraManager::createHeartBeatMessage()
   {
     if(camera.second->getCameraState() == CameraState::NOTINITIALIZED)
     {
+      std::cout<<"wrong"<<std::endl;
       isGO = false;
       break;
     }
