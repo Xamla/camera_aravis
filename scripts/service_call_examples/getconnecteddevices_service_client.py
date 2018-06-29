@@ -8,10 +8,10 @@ from camera_aravis.srv import *
 
 
 def call_getconnecteddevices_service():
-    rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
+    rospy.wait_for_service('camera_aravis_node/get_connected_devices')
     try:
         getSerials = rospy.ServiceProxy(
-            'camera_aravis_node/getconnecteddevices', GetConnectedDevices)
+            'camera_aravis_node/get_connected_devices', GetConnectedDevices)
         resp = getSerials()
 
         print('Number of connected cameras: ' + str(len(resp.serials)))

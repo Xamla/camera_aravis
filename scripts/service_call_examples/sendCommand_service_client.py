@@ -10,10 +10,10 @@ from camera_aravis.srv import *
 
 
 def call_getconnecteddevices_service():
-    rospy.wait_for_service('camera_aravis_node/getconnecteddevices')
+    rospy.wait_for_service('camera_aravis_node/get_connected_devices')
     try:
         getSerials = rospy.ServiceProxy(
-            'camera_aravis_node/getconnecteddevices', GetConnectedDevices)
+            'camera_aravis_node/get_connected_devices', GetConnectedDevices)
         resp = getSerials()
         return resp.serials
 
@@ -22,10 +22,10 @@ def call_getconnecteddevices_service():
 
 
 def call_sendcommand_service(serials, command, value):
-    rospy.wait_for_service('camera_aravis_node/sendcommand')
+    rospy.wait_for_service('camera_aravis_node/send_command')
     try:
         sendCommand = rospy.ServiceProxy(
-            'camera_aravis_node/sendcommand', SendCommand)
+            'camera_aravis_node/send_command', SendCommand)
         resp = sendCommand(serials, command, value)
 
         print(resp.response)

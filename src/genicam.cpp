@@ -345,7 +345,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 
 void GeniCam::processNewBuffer(ArvStream *pStream)
 {
-  auto start = std::chrono::high_resolution_clock::now();
+  //auto start = std::chrono::high_resolution_clock::now();
   uint64_t cn;        // Camera time now
 
   uint64_t rn; // ROS time now
@@ -425,8 +425,8 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       camerainfo.width = widthRoi;
       camerainfo.height = heightRoi;
       lck.unlock();
-      auto end = std::chrono::high_resolution_clock::now();
-      std::cout<<"Time in ProcessNewBuffer"<<std::chrono::duration_cast<std::chrono::microseconds>(end-start).count()<<std::endl;
+      //auto end = std::chrono::high_resolution_clock::now();
+      //std::cout<<"Time in ProcessNewBuffer"<<std::chrono::duration_cast<std::chrono::microseconds>(end-start).count()<<std::endl;
       //std::cout << "Notify " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
       newImageAvailable.notify_all();
 

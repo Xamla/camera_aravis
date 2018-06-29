@@ -20,19 +20,20 @@ CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
   getConnectedDevicesServiceServer =
       phNodeHandle->advertiseService<camera_aravis::GetConnectedDevicesRequest,
                                       camera_aravis::GetConnectedDevicesResponse>
-      ("getconnecteddevices", std::bind(&CameraManager::getConnectedDevices_callback, this, std::placeholders::_1, std::placeholders::_2));
+      ("get_connected_devices", std::bind(&CameraManager::getConnectedDevices_callback, this, std::placeholders::_1, std::placeholders::_2));
 
   sendCommandServiceServer =
       phNodeHandle->advertiseService<camera_aravis::SendCommandRequest,
                                       camera_aravis::SendCommandResponse>
-      ("sendcommand", std::bind(&CameraManager::sendCommand_callback, this, std::placeholders::_1, std::placeholders::_2));
+      ("send_command", std::bind(&CameraManager::sendCommand_callback, this, std::placeholders::_1, std::placeholders::_2));
 
   setIOServiceServer =
       phNodeHandle->advertiseService<camera_aravis::SetIORequest,
                                       camera_aravis::SetIOResponse>
-      ("setio", std::bind(&CameraManager::setIO_callback, this, std::placeholders::_1, std::placeholders::_2));
+      ("set_io", std::bind(&CameraManager::setIO_callback, this, std::placeholders::_1, std::placeholders::_2));
 
   pHeartbeatThread.reset(new std::thread(&CameraManager::runHeartbeat, this));
+  ROS_INFO("-------Initialization Complete----------");
 }
 
 CameraManager::~CameraManager()
@@ -55,7 +56,7 @@ bool CameraManager::runUpdate()
     std::unique_lock<std::mutex> lck(updateMutex);
     if(killUpdateThread.wait_for(lck, waitTime) == std::cv_status::timeout)
     {
-      ROS_INFO("Update device list");
+      //ROS_INFO("Update device list");
       initializeDevices();
     }
   }
