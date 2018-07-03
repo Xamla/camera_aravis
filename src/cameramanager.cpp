@@ -318,7 +318,6 @@ xamla_sysmon_msgs::HeartBeat CameraManager::createHeartbeatMessage()
   {
     if(camera.second->getCameraState() == CameraState::NOTINITIALIZED)
     {
-      std::cout<<"wrong"<<std::endl;
       isGO = false;
       break;
     }
