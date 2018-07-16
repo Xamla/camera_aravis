@@ -44,7 +44,7 @@
 
 struct Global
 {
-  GMainLoop* main_loop;
+  //GMainLoop* main_loop;
   gboolean bCancel;
 
 } global;
@@ -58,16 +58,13 @@ static void set_cancel(int signal) { global.bCancel = TRUE; }
 
 // PeriodicTask_callback()
 // Check for termination, and spin for ROS.
-static gboolean PeriodicTask_callback(void* cameraManager)
+static gboolean PeriodicTask_callback()
 {
-  CameraManager *pCameraManager = (CameraManager*) cameraManager;
-  if (global.bCancel || ros::isShuttingDown())
+  while (!global.bCancel && !ros::isShuttingDown())
   {
-    g_main_loop_quit(global.main_loop);
-    return FALSE;
+    ros::spinOnce();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
-
-  ros::spinOnce();
 
   return TRUE;
 } // PeriodicTask_callback()
@@ -85,18 +82,12 @@ int main(int argc, char** argv)
 
   CameraManager cameraManager(phNode);
 
-  g_timeout_add(20, PeriodicTask_callback, &cameraManager);
-
   void (*pSigintHandlerOld)(int);
   pSigintHandlerOld = signal(SIGINT, set_cancel);
 
-  global.main_loop = 0;
-  global.main_loop = g_main_loop_new(NULL, FALSE);
-  g_main_loop_run(global.main_loop);
+  PeriodicTask_callback();
 
   signal(SIGINT, pSigintHandlerOld);
-
-  g_main_destroy(global.main_loop);
 
   ros::shutdown();
   arv_shutdown();

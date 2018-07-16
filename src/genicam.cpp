@@ -223,6 +223,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       for(size_t i = 0; i<tries; i++)
       {
         //std::cout<<"start trigger "<< std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
+        auto start = std::chrono::high_resolution_clock::now();
         std::unique_lock<std::mutex> lck(imageWaitMutex);
         arv_device_execute_command(pDevice, "TriggerSoftware");
         if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
@@ -235,6 +236,12 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
           throw std::runtime_error("Capture: after 5 times the "
                                    "exposure time or min 100ms and 3 tries an new image was still "
                                    "not available abort; serial: " + serialNumber);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
+        if (duration > std::chrono::milliseconds(200))
+        {
+          std::cout<<"capture image takes: "<< duration.count() << std::endl;
         }
       }
 
