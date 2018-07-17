@@ -135,22 +135,11 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
     nBytesPixel = ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(
         arv_device_get_integer_feature_value(pDevice, "PixelFormat"));
 
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
-
     arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "Continuous");
-    arv_device_set_string_feature_value (pDevice, "TriggerSelector", "ExposureStart");
-    arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
-    arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStart");
+    setCaptureConfiguration();
 
     arv_stream_set_emit_signals(
           (ArvStream*)pStream, TRUE);
-
-
-    cameraState.store(CameraState::READY);
 
     return true;
 
@@ -191,7 +180,6 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 {
   std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
   bool wasStreaming = false;
-  bool changeTriggerMode = false;
   try
   {
     if(!genicamFeatures.is_implemented("TriggerMode") ||
@@ -209,24 +197,16 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       if (cameraState.load() == CameraState::STREAMING)
       {
         wasStreaming = true;
-        arv_device_execute_command(pDevice,
-                                   "AcquisitionStop");
-        arv_device_set_string_feature_value (pDevice, "TriggerSelector", "ExposureStart");
-        arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
-        arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-        arv_device_execute_command(pDevice,
-                                 "AcquisitionStart");
+        setCaptureConfiguration(true);
       }
-      cameraState.store(CameraState::CAPTURING);
-      changeTriggerMode = true;
 
-      std::chrono::microseconds wait_time = std::chrono::microseconds(long(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
-      // set wait_time to a min because the image transport via ethernet is not infinity fast
-      if(wait_time < std::chrono::microseconds(20000))
-      {
-        wait_time = std::chrono::microseconds(20000);
-      }
-      //std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
+//      std::chrono::microseconds wait_time = std::chrono::microseconds(long(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+//      // set wait_time to a min because the image transport via ethernet is not infinity fast
+//      if(wait_time < std::chrono::microseconds(20000))
+//      {
+//        wait_time = std::chrono::microseconds(20000);
+//      }
+      std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
       size_t tries = 3;
       for(size_t i = 0; i<tries; i++)
       {
@@ -244,7 +224,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
                                    "not available abort; serial: " + serialNumber);
         }
       }
-      restoreAquistionsMode(wasStreaming);
+      restoreConfiguration(wasStreaming);
       //auto t3 = std::chrono::high_resolution_clock::now();
       //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
       //std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
@@ -256,9 +236,9 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     }
   } catch(const std::exception& e)
   {
-    if(changeTriggerMode == true)
+    if(wasStreaming == true)
     {
-      restoreAquistionsMode(wasStreaming);
+      restoreConfiguration(wasStreaming);
     }
 
     ROS_WARN("%s", e.what());
@@ -471,15 +451,8 @@ void GeniCam::connectCallback()
 {
   if (publisher.getNumSubscribers() == 1){
     std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
-    cameraState.store(CameraState::STREAMING);
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
-    arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
-    arv_device_set_string_feature_value (pDevice, "TriggerSelector", "AcquisitionStart");
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStart");
-
-    std::string info_text = "someone subscribe to topic " + publisher.getTopic() + " start continuous image aquisition";
+    setStreamingConfiguration();
+    std::string info_text = "someone subscribe to topic " + publisher.getTopic() + " start continuous image aquisition (10 Hz)";
     ROS_INFO("%s",info_text.c_str());
   }
 }
@@ -488,31 +461,48 @@ void GeniCam::disconnectCallback()
 {
   if (publisher.getNumSubscribers() == 0){
     std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
-    arv_device_set_string_feature_value (pDevice, "TriggerSelector", "ExposureStart");
-    arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
-    arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStart");
-    cameraState.store(CameraState::READY);
-
+    setCaptureConfiguration();
     std::string info_text = "number of subscribers to topic " + publisher.getTopic() + " falls to 0. Continuous image aquisition stopped";
     ROS_INFO("%s", info_text.c_str());
   }
 }
 
-void GeniCam::restoreAquistionsMode(const bool& wasStreaming)
+void GeniCam::setStreamingConfiguration()
 {
-  if(wasStreaming == true)
+  arv_device_execute_command(pDevice,
+                             "AcquisitionStop");
+  arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
+  arv_device_set_string_feature_value (pDevice, "TriggerSelector", "AcquisitionStart");
+  arv_device_set_float_feature_value (pDevice, "AcquisitionFrameRate", 10.0);
+  arv_device_execute_command(pDevice,
+                             "AcquisitionStart");
+  cameraState.store(CameraState::STREAMING);
+}
+
+void GeniCam::restoreConfiguration(const bool& wasStreaming)
+{
+  if (wasStreaming==true)
   {
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStop");
-    arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
-    arv_device_set_string_feature_value (pDevice, "TriggerSelector", "AcquisitionStart");
-    arv_device_execute_command(pDevice,
-                               "AcquisitionStart");
-    cameraState.store(CameraState::STREAMING);
+    setStreamingConfiguration();
+  }
+  else
+  {
+    cameraState.store(CameraState::READY);
+  }
+}
+
+void GeniCam::setCaptureConfiguration(const bool& startCapture)
+{
+  arv_device_execute_command(pDevice,
+                             "AcquisitionStop");
+  arv_device_set_string_feature_value (pDevice, "TriggerSelector", "ExposureStart");
+  arv_device_set_string_feature_value (pDevice, "TriggerMode", "On");
+  arv_device_set_string_feature_value (pDevice, "TriggerSource", "Software");
+  arv_device_execute_command(pDevice,
+                             "AcquisitionStart");
+  if (startCapture == true)
+  {
+   cameraState.store(CameraState::CAPTURING);
   }
   else
   {

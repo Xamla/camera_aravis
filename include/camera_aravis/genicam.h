@@ -51,7 +51,9 @@ protected:
   void connectCallback();
   void disconnectCallback();
 
-  void restoreAquistionsMode(const bool& wasStreaming);
+  void setStreamingConfiguration();
+  void restoreConfiguration(const bool& wasStreaming=false);
+  void setCaptureConfiguration(const bool& startCapture=false);
 
   //----attributes---
   std::string serialNumber;
