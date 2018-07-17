@@ -30,7 +30,7 @@ class capture_client:
     def call_capture_service(self, serials):
         rospy.wait_for_service('camera_aravis_node/capture')
         try:
-            for k in range(0,10000):
+            for k in range(0,40000):
                 start = time.time()
                 capture = rospy.ServiceProxy('camera_aravis_node/capture', Capture)
                 resp = capture(serials)

@@ -14,7 +14,7 @@
 
 #include "camera_aravis/genicamfeatures.h"
 
-enum CameraState{NOTINITIALIZED, READY, STREAMING};
+enum CameraState{NOTINITIALIZED, READY, STREAMING, CAPTURING};
 
 class GeniCam
 {
