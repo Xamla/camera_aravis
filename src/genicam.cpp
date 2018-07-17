@@ -205,7 +205,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     }
     if(cameraState.load() != CameraState::NOTINITIALIZED)
     {
-      auto start = std::chrono::high_resolution_clock::now();
+      //auto start = std::chrono::high_resolution_clock::now();
       if (cameraState.load() == CameraState::STREAMING)
       {
         wasStreaming = true;
@@ -220,13 +220,13 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       cameraState.store(CameraState::CAPTURING);
       changeTriggerMode = true;
 
-//      (int(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
-//      // set wait_time to a min because the image transport via ethernet is not infinity fast
-//      if(wait_time < std::chrono::microseconds(20000))
-//      {
-//        wait_time = std::chrono::microseconds(20000);
-//      }
-      std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
+      std::chrono::microseconds wait_time = std::chrono::microseconds(long(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+      // set wait_time to a min because the image transport via ethernet is not infinity fast
+      if(wait_time < std::chrono::microseconds(20000))
+      {
+        wait_time = std::chrono::microseconds(20000);
+      }
+      //std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
       size_t tries = 3;
       for(size_t i = 0; i<tries; i++)
       {
@@ -243,17 +243,11 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
                                    "exposure time or min 100ms and 3 tries an new image was still "
                                    "not available abort; serial: " + serialNumber);
         }
-        //auto end = std::chrono::high_resolution_clock::now();
-        //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
-//        if (duration > std::chrono::milliseconds(200))
-//        {
-//          std::cout<<"capture image takes: "<< duration.count() << std::endl;
-//        }
       }
       restoreAquistionsMode(wasStreaming);
-      auto t3 = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
-      std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
+      //auto t3 = std::chrono::high_resolution_clock::now();
+      //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
+      //std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
     }
     else
     {
@@ -281,21 +275,21 @@ bool GeniCam::tryToSetFeatureValue(const std::string &feature, const std::string
      (cameraState.load() != CameraState::NOTINITIALIZED))
   {
     std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
-//    if(cameraState.load() == CameraState::STREAMING)
-//    {
-//      wasStreaming = true;
-//      arv_device_execute_command(pDevice,
-//                               "AcquisitionStop");
-//    }
+    if(cameraState.load() == CameraState::STREAMING)
+    {
+      wasStreaming = true;
+      arv_device_execute_command(pDevice,
+                               "AcquisitionStop");
+    }
 
     setSucessful = genicamFeatures.get_feature(feature)->set_current_value(
           pDevice, value);
 
-//    if(wasStreaming == true)
-//    {
-//      arv_device_execute_command(pDevice,
-//                               "AcquisitionStart");
-//    }
+    if(wasStreaming == true)
+    {
+      arv_device_execute_command(pDevice,
+                               "AcquisitionStart");
+    }
   }
   if(setSucessful == true) return true;
   else return false;
@@ -438,7 +432,6 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       camerainfo.header.frame_id = imageMsg.header.frame_id;
       camerainfo.width = widthRoi;
       camerainfo.height = heightRoi;
-      std::cout<<"Current state is: "<<cameraState.load()<<std::endl;
       lck.unlock();
       newImageAvailable.notify_all();
 
