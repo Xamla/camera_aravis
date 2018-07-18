@@ -200,13 +200,13 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
         setCaptureConfiguration(true);
       }
 
-//      std::chrono::microseconds wait_time = std::chrono::microseconds(long(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
-//      // set wait_time to a min because the image transport via ethernet is not infinity fast
-//      if(wait_time < std::chrono::microseconds(20000))
-//      {
-//        wait_time = std::chrono::microseconds(20000);
-//      }
-      std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000);
+      std::chrono::microseconds wait_time = std::chrono::microseconds(long(arv_device_get_float_feature_value(pDevice, "ExposureTime")));
+      // set wait_time to a min because the image transport via ethernet is not infinity fast
+      if(wait_time < std::chrono::milliseconds(60))
+      {
+        wait_time = std::chrono::milliseconds(60);
+      }
+      //std::chrono::milliseconds wait_time = std::chrono::milliseconds(80);
       size_t tries = 3;
       for(size_t i = 0; i<tries; i++)
       {
@@ -221,7 +221,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
         else if(i==tries-1)
         {
           throw std::runtime_error("Capture: after 5 times the "
-                                   "exposure time or min 100ms and 3 tries an new image was still "
+                                   "exposure time or min 300ms and 3 tries an new image was still "
                                    "not available abort; serial: " + serialNumber);
         }
       }
@@ -300,8 +300,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 200; // milliseconds
-  unsigned int timeoutFrameRetention = 400;
+  unsigned int timeoutPacket = 100; // milliseconds
+  unsigned int timeoutFrameRetention = 200;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
