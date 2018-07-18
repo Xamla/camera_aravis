@@ -193,7 +193,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
     }
     if(cameraState.load() != CameraState::NOTINITIALIZED)
     {
-      //auto start = std::chrono::high_resolution_clock::now();
+      auto start = std::chrono::high_resolution_clock::now();
       if (cameraState.load() == CameraState::STREAMING)
       {
         wasStreaming = true;
@@ -211,6 +211,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       for(size_t i = 0; i<tries; i++)
       {
         std::unique_lock<std::mutex> lck(imageWaitMutex);
+        std::cout << "Trigger " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
         arv_device_execute_command(pDevice, "TriggerSoftware");
         if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
         {
@@ -225,9 +226,12 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
         }
       }
       restoreConfiguration(wasStreaming);
-      //auto t3 = std::chrono::high_resolution_clock::now();
-      //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
-      //std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
+      auto t3 = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
+      if (duration > std::chrono::milliseconds(200))
+      {
+        std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
+      }
     }
     else
     {
@@ -296,8 +300,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 2000; // milliseconds
-  unsigned int timeoutFrameRetention = 3000;
+  unsigned int timeoutPacket = 200; // milliseconds
+  unsigned int timeoutFrameRetention = 400;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
@@ -334,6 +338,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 
 void GeniCam::processNewBuffer(ArvStream *pStream)
 {
+  auto start = std::chrono::high_resolution_clock::now();
   uint64_t cn;        // Camera time now
 
   uint64_t rn; // ROS time now
@@ -359,7 +364,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
   {
     if (arv_buffer_get_status(pBuffer) == ARV_BUFFER_STATUS_SUCCESS)
     {
-      //std::cout << "Notify " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
+      std::cout << "Notify " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()<<std::endl;
       nBuffers++;
       size_t pSize = 0;
       const void* pData = arv_buffer_get_data(pBuffer, &pSize);
@@ -416,12 +421,19 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       newImageAvailable.notify_all();
 
       publisher.publish(imageMsg, camerainfo);
+
     }
     else
       ROS_WARN("Frame error: %s",
                szBufferStatusFromInt[arv_buffer_get_status(pBuffer)]);
 
     arv_stream_push_buffer(pStream, pBuffer);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
+    if (duration > std::chrono::microseconds(1))
+    {
+      std::cout<<"process buffer takes: "<<duration.count()<<"ms"<<std::endl;
+    }
   }
 }
 

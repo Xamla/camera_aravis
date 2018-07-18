@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <launch>
   <node name="camera_aravis_node" pkg="camera_aravis" type="camera_aravis_node" output="screen">
-    <rosparam param="camera_serials">['IDS-4103217455','IDS-4103235743']</rosparam>
+    <!--<rosparam param="camera_serials">['IDS-4103217455','IDS-4103235743']</rosparam>-->
     <!--<rosparam param="camera_serials">['4103217455','4103235743']</rosparam>-->
-    <rosparam ns="4103217455/feature">ExposureTime: '30000'</rosparam>
+    <!--<rosparam ns="4103217455/feature">ExposureTime: '30000'</rosparam>-->
   </node>
 </launch>
