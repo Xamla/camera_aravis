@@ -300,8 +300,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 {
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
-  unsigned int timeoutPacket = 100; // milliseconds
-  unsigned int timeoutFrameRetention = 200;
+  unsigned int timeoutPacket = 20; // milliseconds
+  unsigned int timeoutFrameRetention = 100;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
