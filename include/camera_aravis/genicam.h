@@ -5,6 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <glib.h>
+#include <chrono>
 
 #include <std_msgs/Int64.h>
 #include <image_transport/image_transport.h>
@@ -71,6 +72,7 @@ protected:
   std::shared_ptr<camera_info_manager::CameraInfoManager> pCameraInfoManager;
   sensor_msgs::CameraInfo camerainfo;
   sensor_msgs::Image imageMsg;
+  std::chrono::high_resolution_clock::time_point processBufferTime;
 
   // aravis g_objects
   ArvCamera* pCamera;
