@@ -6,12 +6,14 @@
 #include <condition_variable>
 #include <glib.h>
 #include <chrono>
+#include <vector>
 
 #include <std_msgs/Int64.h>
 #include <image_transport/image_transport.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
+#include <functional>
 
 #include "camera_aravis/genicamfeatures.h"
 

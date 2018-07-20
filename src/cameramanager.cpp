@@ -22,6 +22,11 @@ CameraManager::CameraManager(std::shared_ptr<ros::NodeHandle> &nodeHandle):
                                       camera_aravis::GetConnectedDevicesResponse>
       ("get_connected_devices", std::bind(&CameraManager::getConnectedDevices_callback, this, std::placeholders::_1, std::placeholders::_2));
 
+  getFeatureValueServiceServer =
+      phNodeHandle->advertiseService<camera_aravis::GetFeatureValueRequest,
+                                     camera_aravis::GetFeatureValueResponse>
+      ("get_feature_value", std::bind(&CameraManager::getFeatureValue_callback, this, std::placeholders::_1, std::placeholders::_2));
+
   sendCommandServiceServer =
       phNodeHandle->advertiseService<camera_aravis::SendCommandRequest,
                                       camera_aravis::SendCommandResponse>
@@ -135,7 +140,7 @@ bool CameraManager::sendCommand_callback(camera_aravis::SendCommandRequest &requ
         if(!iter->second->tryToSetFeatureValue(request.command_name, std::to_string(request.value)))
         {
           throw std::runtime_error("sendCommand Service: requested feature: " + request.command_name +
-                                   "is not available for or could not be set"
+                                   "is not available or could not be set for"
                                    "camera with serial " + serial + " , abort");
         }
       }
@@ -151,6 +156,48 @@ bool CameraManager::sendCommand_callback(camera_aravis::SendCommandRequest &requ
       response.response = "only the command for cameras before the camera with serial "
                           "number " + serial + " could be executed";
       ROS_WARN("%s", e.what());
+      return false;
+    }
+  }
+  response.response="everthing works fine";
+  return true;
+}
+
+bool CameraManager::getFeatureValue_callback(camera_aravis::GetFeatureValueRequest &request,
+                                             camera_aravis::GetFeatureValueResponse& response)
+{
+  for(size_t i=0; i<request.serials.size(); i++)
+  {
+    auto iter = cameras.find(request.serials[i]);
+    try
+    {
+      if(iter != cameras.end() &&
+         (iter->second->getCameraState() != CameraState::NOTINITIALIZED))
+      {
+        std::string value;
+        if(!iter->second->tryToGetFeatureValue(request.features[i], value))
+        {
+          throw std::runtime_error("getFeatureValue Service: requested feature: " + request.features[i] +
+                                   "is not available for"
+                                   "camera with serial " + request.serials[i] + " , abort");
+        }
+        else
+        {
+          response.values.push_back(value);
+        }
+      }
+      else
+      {
+        throw std::runtime_error("getFeatureValue Service: camera with serial "
+                           + request.serials[i] + " is not available, abort process");
+      }
+
+    }
+    catch(const std::runtime_error &e)
+    {
+      response.response = "error";
+      ROS_WARN("%s", e.what());
+      response.values.clear();
       return false;
     }
   }

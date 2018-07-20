@@ -21,6 +21,7 @@ add_service_files(
   FILES
     Capture.srv
     GetConnectedDevices.srv
+    GetFeatureValue.srv
     SendCommand.srv
     SetIO.srv
 )
@@ -58,6 +59,7 @@ catkin_install_python(PROGRAMS scripts/service_call_examples/capture_service_cli
   scripts/service_call_examples/collect_image_and_joint_values.py
   scripts/service_call_examples/getconnecteddevices_service_client.py
   scripts/service_call_examples/sendCommand_service_client.py
+  scripts/service_call_examples/getfeaturevalue_service_client.py
   scripts/service_call_examples/setIO_service_client.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
