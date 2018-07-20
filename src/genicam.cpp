@@ -348,6 +348,9 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 void GeniCam::processNewBuffer(ArvStream *pStream)
 {
   auto start = std::chrono::high_resolution_clock::now();
+  static std::mutex processNewBufferMutex;
+  std::lock_guard<std::mutex> guard(processNewBufferMutex);
+
   uint64_t cn;        // Camera time now
 
   uint64_t rn; // ROS time now
@@ -481,7 +484,7 @@ void GeniCam::connectCallback()
   if (publisher.getNumSubscribers() == 1){
     std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
     setStreamingConfiguration();
-    std::string info_text = "someone subscribe to topic " + publisher.getTopic() + " start continuous image aquisition (10 Hz)";
+    std::string info_text = "someone subscribe to topic " + publisher.getTopic() + " start continuous image aquisition (2 Hz)";
     ROS_INFO("%s",info_text.c_str());
   }
 }
