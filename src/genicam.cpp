@@ -49,6 +49,7 @@ GeniCam::~GeniCam()
 
 void GeniCam::newbuffer_callback(ArvStream *pStream, GeniCam *pCameradata)
 {
+  //std::cout<<"stream: "<<pStream<<" cameradata: "<<pCameradata<<std::endl;
   pCameradata->processNewBuffer(pStream);
 }
 
@@ -176,11 +177,10 @@ void GeniCam::showStatistic()
   }
 }
 
-bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
+bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer, const size_t& position)
 {
-  static std::mutex captureVectorOperationMutex;
-  std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
-  bool wasStreaming = false;
+  //static std::mutex captureVectorOperationMutex;
+  std::lock_guard<std::mutex> lck(aquisitionChangeMutex);  bool wasStreaming = false;
   try
   {
     if(!genicamFeatures.is_implemented("TriggerMode") ||
@@ -223,8 +223,8 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
             continue;
           }
           {
-           std::lock_guard<std::mutex> protectPushBack(captureVectorOperationMutex);
-           imageContainer.push_back(imageMsg);
+           //std::lock_guard<std::mutex> protectPushBack(captureVectorOperationMutex);
+           imageContainer[position]=imageMsg;
           }
           break;
         }
@@ -348,8 +348,8 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 void GeniCam::processNewBuffer(ArvStream *pStream)
 {
   auto start = std::chrono::high_resolution_clock::now();
-  static std::mutex processNewBufferMutex;
-  std::lock_guard<std::mutex> guard(processNewBufferMutex);
+  //static std::mutex processNewBufferMutex;
+  //std::lock_guard<std::mutex> guard(processNewBufferMutex);
 
   uint64_t cn;        // Camera time now
 

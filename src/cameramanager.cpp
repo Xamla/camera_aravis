@@ -97,11 +97,13 @@ bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
       }
     }
 
-    for(auto& serial : request.serials)
+    response.images.resize(request.serials.size());
+
+    for(size_t i=0; i<request.serials.size(); i++)
     {
-      auto iter = cameras.find(serial);
-      captureFutures.emplace(serial, std::async(std::launch::async, &GeniCam::capture, iter->second,
-                                                std::ref(response.images)));
+      auto iter = cameras.find(request.serials[i]);
+      captureFutures.emplace(request.serials[i], std::async(std::launch::async, &GeniCam::capture, iter->second,
+                                                 std::ref(response.images), std::ref(i)));
     }
 
 
@@ -121,6 +123,10 @@ bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
 
       throw std::runtime_error("Capture Service: image capture timeout for camera with serial " + res.str() +
                                  ", abort complete process");
+    }
+    else
+    {
+      response.serials = request.serials;
     }
   } catch(const std::runtime_error& e)
   {
