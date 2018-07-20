@@ -1,6 +1,7 @@
 #include "camera_aravis/cameramanager.h"
 #include <algorithm>
 #include <ctype.h>
+#include <future>
 
 // -- Public methods
 
@@ -73,37 +74,55 @@ bool CameraManager::runUpdate()
 bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
                                      camera_aravis::CaptureResponse &response)
 {
-  for(auto& serial : request.serials)
-  {
-    auto iter = cameras.find(serial);
-    try
-    {
+  std::unordered_map<std::string, std::future<bool>> captureFutures;
+  std::vector<std::string> endWithTimeOut;
 
-      if(iter != cameras.end() &&
-         (iter->second->getCameraState() != CameraState::NOTINITIALIZED))
-      {
-        if(iter->second->capture(response.images))
-          response.serials.push_back(serial);
-        else
-        {
-          throw std::runtime_error("Capture Service: image capture timeout for camera with serial " + serial +
-                                   ", abort complete process");
-        }
-      }
-      else
+  try
+  {
+    for(auto& serial : request.serials)
+    {
+      auto iter = cameras.find(serial);
+
+      if(iter == cameras.end() &&
+         (iter->second->getCameraState() == CameraState::NOTINITIALIZED))
       {
         throw std::runtime_error("Capture Service: camera with serial "
-                           + serial + " is not available, "
-                                      "abort complete process");
+                                 + serial + " is not available, "
+                                 "abort complete process");
       }
-
-    } catch(const std::exception& e)
-    {
-      ROS_WARN("%s", e.what());
-      response.images.clear();
-      response.serials.clear();
-      return false;
     }
+
+    for(auto& serial : request.serials)
+    {
+      auto iter = cameras.find(serial);
+      captureFutures.emplace(serial, std::async(std::launch::async, &GeniCam::capture, iter->second,
+                                                std::ref(response.images)));
+    }
+
+
+    for(auto& capture : captureFutures)
+    {
+       if(!capture.second.get())
+       {
+         endWithTimeOut.push_back(capture.first);
+       }
+    }
+
+    if (endWithTimeOut.size()>0)
+    {
+      std::stringstream res;
+      std::copy(endWithTimeOut.begin(), endWithTimeOut.end(),
+                std::ostream_iterator<std::string>(res, ","));
+
+      throw std::runtime_error("Capture Service: image capture timeout for camera with serial " + res.str() +
+                                 ", abort complete process");
+    }
+  } catch(const std::runtime_error& e)
+  {
+    ROS_WARN("%s", e.what());
+    response.images.clear();
+    response.serials.clear();
+    return false;
   }
   return true;
 }

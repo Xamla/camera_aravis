@@ -178,6 +178,7 @@ void GeniCam::showStatistic()
 
 bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
 {
+  static std::mutex captureVectorOperationMutex;
   std::lock_guard<std::mutex> lck(aquisitionChangeMutex);
   bool wasStreaming = false;
   try
@@ -221,7 +222,10 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
             std::cout<<"trigger to process time in ms: "<<std::chrono::duration_cast<std::chrono::milliseconds>(processBufferTime-trigger).count() << std::endl;
             continue;
           }
-          imageContainer.push_back(imageMsg);
+          {
+           std::lock_guard<std::mutex> protectPushBack(captureVectorOperationMutex);
+           imageContainer.push_back(imageMsg);
+          }
           break;
         }
         else if(i==tries-1)
@@ -245,7 +249,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer)
       throw std::runtime_error("Capture: camera with serial "
                          + serialNumber + "is not available");
     }
-  } catch(const std::exception& e)
+  } catch(const std::runtime_error& e)
   {
     if(wasStreaming == true)
     {
