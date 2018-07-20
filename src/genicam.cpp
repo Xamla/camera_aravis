@@ -297,11 +297,9 @@ bool GeniCam::tryToGetFeatureValue(const std::string &feature, std::string &valu
     if(cameraState.load() != CameraState::NOTINITIALIZED)
     {
       value = genicamFeatures.get_feature(feature)->get_current_value(pDevice);
+      return true;
     }
-    return true;
   }
-  else
-
   return false;
 }
 

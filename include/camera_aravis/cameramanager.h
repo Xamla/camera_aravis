@@ -5,6 +5,7 @@
 
 #include <camera_aravis/Capture.h>
 #include <camera_aravis/GetConnectedDevices.h>
+#include <camera_aravis/GetFeatureValue.h>
 #include <camera_aravis/SendCommand.h>
 #include <camera_aravis/SetIO.h>
 
@@ -28,6 +29,9 @@ public:
 
   bool getConnectedDevices_callback(camera_aravis::GetConnectedDevicesRequest,
                                    camera_aravis::GetConnectedDevicesResponse& response);
+
+  bool getFeatureValue_callback(camera_aravis::GetFeatureValueRequest& request,
+                                camera_aravis::GetFeatureValueResponse& response);
 
   bool sendCommand_callback(camera_aravis::SendCommandRequest& request,
                        camera_aravis::SendCommandResponse& response);
@@ -61,6 +65,7 @@ protected:
 
   ros::ServiceServer captureServiceServer;
   ros::ServiceServer getConnectedDevicesServiceServer;
+  ros::ServiceServer getFeatureValueServiceServer;
   ros::ServiceServer sendCommandServiceServer;
   ros::ServiceServer setIOServiceServer;
 

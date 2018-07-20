@@ -1,0 +1,5 @@
+string[] serials         # serial numbers to select specific cameras (emtpy string means all cameras)
+string[] features
+---
+string[] values
+string response
