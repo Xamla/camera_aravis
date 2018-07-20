@@ -103,7 +103,7 @@ bool CameraManager::capture_callback(camera_aravis::CaptureRequest &request,
     {
       auto iter = cameras.find(request.serials[i]);
       captureFutures.emplace(request.serials[i], std::async(std::launch::async, &GeniCam::capture, iter->second,
-                                                 std::ref(response.images), std::ref(i)));
+                                                 std::ref(response.images), i));
     }
 
 

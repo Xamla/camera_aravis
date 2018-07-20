@@ -38,7 +38,7 @@ public:
 
   void showStatistic();
 
-  bool capture(std::vector<sensor_msgs::Image>& imageContainer, const size_t &position);
+  bool capture(std::vector<sensor_msgs::Image>& imageContainer, size_t position);
 
   bool tryToSetFeatureValue(const std::string& feature, const std::string& value);
   bool tryToGetFeatureValue(const std::string& feature, std::string &value);
