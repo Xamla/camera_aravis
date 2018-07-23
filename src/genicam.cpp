@@ -217,9 +217,9 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer, size_t po
         arv_device_execute_command(pDevice, "TriggerSoftware");
         if(newImageAvailable.wait_for(lck, wait_time*5)==std::cv_status::no_timeout)
         {
+          std::cout<<this->serialNumber<<" trigger to process time in ms: "<<std::chrono::duration_cast<std::chrono::milliseconds>(processBufferTime-trigger).count() << std::endl;
           if(imageMsg.data.size() == 0)
           {
-            std::cout<<"trigger to process time in ms: "<<std::chrono::duration_cast<std::chrono::milliseconds>(processBufferTime-trigger).count() << std::endl;
             continue;
           }
           {
@@ -241,7 +241,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer, size_t po
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t3-start);
       if (duration > std::chrono::milliseconds(200))
       {
-        std::cout<<"query image takes: "<<duration.count()<<"ms"<<std::endl;
+        std::cout<<this->serialNumber<<" query image takes: "<<duration.count()<<"ms"<<std::endl;
       }
     }
     else
