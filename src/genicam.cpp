@@ -332,7 +332,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
 
     // Load up some buffers.
     nbytesPayload = arv_camera_get_payload(pCamera);
-    for (int i = 0; i < 50; i++)
+    for (int i = 0; i < 1; i++)
     {
       pBuffer = arv_buffer_new(nbytesPayload, NULL);
       arv_stream_push_buffer((ArvStream*)pStream, pBuffer);
