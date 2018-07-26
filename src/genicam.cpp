@@ -306,7 +306,7 @@ ArvGvStream* GeniCam::createStream(const std::string &camera_serial)
   gboolean bAutoBuffer = FALSE;
   gboolean bPacketResend = TRUE;
   unsigned int timeoutPacket = 40; // milliseconds
-  unsigned int timeoutFrameRetention = 200;
+  unsigned int timeoutFrameRetention = 300;
 
   ArvGvStream* pStream =
       (ArvGvStream*)arv_device_create_stream(pDevice, stream_cb, NULL);
@@ -498,7 +498,7 @@ void GeniCam::setStreamingConfiguration()
                              "AcquisitionStop");
   arv_device_set_string_feature_value (pDevice, "TriggerMode", "Off");
   arv_device_set_string_feature_value (pDevice, "TriggerSelector", "AcquisitionStart");
-  arv_device_set_float_feature_value (pDevice, "AcquisitionFrameRate", 2.0);
+  arv_device_set_float_feature_value (pDevice, "AcquisitionFrameRate", 10.0);
   arv_device_execute_command(pDevice,
                              "AcquisitionStart");
   cameraState.store(CameraState::STREAMING);
