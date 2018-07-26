@@ -179,7 +179,6 @@ void GeniCam::showStatistic()
 
 bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer, size_t position)
 {
-  //static std::mutex captureVectorOperationMutex;
   std::lock_guard<std::mutex> lck(aquisitionChangeMutex);  bool wasStreaming = false;
   try
   {
@@ -222,10 +221,7 @@ bool GeniCam::capture(std::vector<sensor_msgs::Image> &imageContainer, size_t po
           {
             continue;
           }
-          {
-           //std::lock_guard<std::mutex> protectPushBack(captureVectorOperationMutex);
-           imageContainer[position]=imageMsg;
-          }
+          imageContainer[position]=imageMsg;
           break;
         }
         else if(i==tries-1)
