@@ -7,6 +7,8 @@
 #include <glib.h>
 #include <chrono>
 #include <vector>
+#include <unordered_map>
+#include <utility>
 
 #include <std_msgs/Int64.h>
 #include <image_transport/image_transport.h>
@@ -14,6 +16,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <functional>
+
+#include <opencv2/core/core.hpp>
 
 #include "camera_aravis/genicamfeatures.h"
 
@@ -94,8 +98,11 @@ protected:
   int widthRoi;
   int heightRoi;
 
-  const char* pszPixelformat;
-  unsigned nBytesPixel;
+  std::string geniCamPixelformat;
+  std::string rosPixelformat;
+  size_t nBytesPixel;
+  bool isRGB;
+  std::function<void(cv::Mat, cv::Mat)> debayerFunc;
 
   size_t sequenceCounter;
   size_t nBuffers; // Counter for Hz calculation.
@@ -104,6 +111,12 @@ protected:
   uint64_t cm;// Camera time prev
   uint64_t tm;// Calculated image time prev
   int64_t em;// Error prev.
+
+private:
+  //image encodings map
+  static std::unordered_map<std::string, std::pair<std::string, size_t>> encodingMap;
+  static std::unordered_map<std::string, std::function<void(cv::Mat, cv::Mat)>> rgbConvertMap;
+
 };
 
 #endif // GENICAM_H

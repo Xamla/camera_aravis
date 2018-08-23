@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_service_files(
   DIRECTORY
@@ -40,13 +41,13 @@ catkin_package(
     LIBRARIES
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${Aravis_INCLUDE_DIRS} ${GLIB2_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${Aravis_INCLUDE_DIRS} ${GLIB2_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME}_node
     src/cameranode.cpp src/genicamfeatures.cpp
     src/cameramanager.cpp src/genicam.cpp)
 
-target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${Aravis_LIBRARIES} glib-2.0 gmodule-2.0 gobject-2.0)
+target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${Aravis_LIBRARIES} ${OpenCV_LIBRARIES} glib-2.0 gmodule-2.0 gobject-2.0)
 add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
 
 install(TARGETS ${PROJECT_NAME}_node

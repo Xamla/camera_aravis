@@ -1,4 +1,6 @@
 #include "camera_aravis/genicam.h"
+#include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/imgcodecs.hpp"
 
 // -- defines --
 
@@ -25,7 +27,23 @@ static void stream_cb (void *user_data, ArvStreamCallbackType type, ArvBuffer *b
   }
 }
 
+// -- static attributes ---
 
+std::unordered_map<std::string, std::pair<std::string, size_t>> GeniCam::encodingMap = {
+  {"Mono8", {"mono8", 1}},
+  {"Mono16",{"mono16",2}},
+  {"BayerGR8",{"rgb8",3}},
+  {"BayerRG8",{"rgb8",3}},
+  {"BayerGB8",{"rgb8",3}},
+  {"BayerBG8",{"rgb8",3}}
+};
+
+std::unordered_map<std::string, std::function<void(cv::Mat, cv::Mat)>> GeniCam::rgbConvertMap = {
+  {"BayerGR8", std::bind(&cv::cvtColor, std::placeholders::_1, std::placeholders::_2, cv::COLOR_BayerGB2RGB, 3)},
+  {"BayerRG8", std::bind(&cv::cvtColor, std::placeholders::_1, std::placeholders::_2, cv::COLOR_BayerBG2RGB, 3)},
+  {"BayerGB8", std::bind(&cv::cvtColor, std::placeholders::_1, std::placeholders::_2, cv::COLOR_BayerGR2RGB, 3)},
+  {"BayerBG8", std::bind(&cv::cvtColor, std::placeholders::_1, std::placeholders::_2, cv::COLOR_BayerRG2RGB, 3)}
+};
 
 // --- constructor ---
 
@@ -37,6 +55,7 @@ GeniCam::GeniCam(std::shared_ptr<ros::NodeHandle> &phNode, const std::pair<const
 {
   serialNumber = serial_deviceid.first;
   deviceID = serial_deviceid.second;
+  isRGB = false;
   reestablishConnection(phNode);
 }
 
@@ -129,11 +148,41 @@ bool GeniCam::reestablishConnection(std::shared_ptr<ros::NodeHandle> &phNode)
                           &widthRoi,
                           &heightRoi);
 
-    pszPixelformat =
-        g_string_ascii_down(g_string_new(arv_device_get_string_feature_value(
-                                pDevice, "PixelFormat")))->str;
-    nBytesPixel = ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(
-        arv_device_get_integer_feature_value(pDevice, "PixelFormat"));
+    geniCamPixelformat = g_string_new(arv_device_get_string_feature_value(
+                                  pDevice, "PixelFormat"))->str;
+
+    auto iter = encodingMap.find(geniCamPixelformat);
+
+    if (iter == encodingMap.end())
+    {
+      ROS_WARN("Pixel format: %s is not supported streaming and capturing is not possible: error 1", geniCamPixelformat);
+      return false;
+    }
+    else
+    {
+      rosPixelformat = iter->second.first;
+      nBytesPixel = iter->second.second;
+
+      if (rosPixelformat.find("rgb")!=std::string::npos)
+      {
+        isRGB = true;
+        auto funcIter = rgbConvertMap.find(geniCamPixelformat);
+        if (funcIter == rgbConvertMap.end())
+        {
+          ROS_WARN("Pixel format: %s is not supported streaming and capturing is not possible: error 2", geniCamPixelformat);
+          return false;
+        }
+        else
+        {
+          debayerFunc = funcIter->second;
+          ROS_INFO("Source PixelFormat: %s", geniCamPixelformat.c_str());
+        }
+      }
+
+    }
+
+    //nBytesPixel = ARV_PIXEL_FORMAT_BYTE_PER_PIXEL(
+    //    arv_device_get_integer_feature_value(pDevice, "PixelFormat"));
 
     arv_device_set_string_feature_value (pDevice, "AcquisitionMode", "Continuous");
     setCaptureConfiguration();
@@ -374,7 +423,7 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       nBuffers++;
       size_t pSize = 0;
       const void* pData = arv_buffer_get_data(pBuffer, &pSize);
-      std::vector<uint8_t> this_data(pSize);
+      std::vector<uchar> this_data(pSize);
       memcpy(&this_data[0], pData, pSize);
 
       // Camera/ROS Timestamp coordination.
@@ -412,9 +461,21 @@ void GeniCam::processNewBuffer(ArvStream *pStream)
       imageMsg.header.frame_id = frame_id;
       imageMsg.width = widthRoi;
       imageMsg.height = heightRoi;
-      imageMsg.encoding = pszPixelformat;
+      imageMsg.encoding = rosPixelformat;
       imageMsg.step = imageMsg.width * nBytesPixel;
-      imageMsg.data = this_data;
+      if(isRGB == true)
+      {
+        //  cv::CV_8UC1
+        cv::Mat bayerImage = cv::Mat(heightRoi, widthRoi, 0, this_data.data());
+        cv::Mat rgbImage(heightRoi, widthRoi, 16);
+
+        debayerFunc(bayerImage, rgbImage);
+        imageMsg.data = std::vector<uchar>(rgbImage.datastart, rgbImage.dataend);
+      }
+      else
+      {
+        imageMsg.data = this_data;
+      }
 
       // get current CameraInfo data
       camerainfo = pCameraInfoManager->getCameraInfo();
